@@ -14,6 +14,7 @@ The application is split into three main files located in the same directory:
 ├── index.html     # The User Interface (HTML5 & Tailwind CSS structure)
 ├── config.js      # The Weekly Persona Configuration (Customizable settings)
 └── app.js         # The Application Logic (API integrations & UI manipulation)
+```
 1. Presentation Layer (index.html)
 Handles the visual structure, layout, and responsive design using Tailwind CSS utility classes. It mirrors USC's official branding with cardinal (#990000) and gold (#FFC72C) accents. It acts as a passive layout shell that imports the behavioral scripts at the bottom of the document.
 
