@@ -122,11 +122,13 @@ function appendMessage(text, sender) {
     } else if (sender === 'bot') {
         div.className = 'flex gap-3 max-w-[85%]';
         
-        // --- NEW MARKDOWN LOGIC ---
-        // Convert the raw Gemini markdown into HTML using marked.parse()
+        // --- NEW MARKDOWN + MATH LOGIC ---
+        // Tell marked.js to use the KaTeX extension for math
+        marked.use(window.markedKatex({ throwOnError: false }));
+        
+        // Convert the raw Gemini markdown & LaTeX into HTML
         const formattedHTML = marked.parse(text);
         
-        // Notice the added "prose prose-sm prose-stone max-w-none" classes below
         div.innerHTML = `
             <div class="w-8 h-8 rounded-full bg-[#990000]/10 flex items-center justify-center text-[#990000] shrink-0">
                 <i class="${activeBot.iconClass} text-sm"></i>
