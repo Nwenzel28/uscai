@@ -10,9 +10,10 @@ let currentBotIndex = 0;
 document.addEventListener('DOMContentLoaded', () => {
     updateBotUI(); // Initialize the first bot
     
-    // Auto-detect if a key is already saved
+    // Auto-detect if a key is already saved and adjust UI
     if (localStorage.getItem('gemini_api_key')) {
-        document.getElementById('apiKeyInput').placeholder = 'Key already saved. Paste a new one to update it.';
+        document.getElementById('apiSetupPanel').classList.add('hidden');
+        document.getElementById('updateKeyBtn').classList.remove('hidden');
     }
 });
 
@@ -40,10 +41,22 @@ function saveKey() {
         localStorage.setItem('gemini_api_key', key);
         alert('Key saved. You are ready to go.');
         document.getElementById('apiKeyInput').value = '';
-        document.getElementById('apiKeyInput').placeholder = 'Key already saved. Paste a new one to update it.';
+        
+        // Hide the big top panel, show the small bottom button
+        document.getElementById('apiSetupPanel').classList.add('hidden');
+        document.getElementById('updateKeyBtn').classList.remove('hidden');
     } else {
         alert('Please paste a valid API key first.');
     }
+}
+
+// Show the API key setup panel again if the user wants to update it
+function showApiKeyPanel() {
+    document.getElementById('apiSetupPanel').classList.remove('hidden');
+    document.getElementById('updateKeyBtn').classList.add('hidden');
+    
+    // Auto-focus the input box for convenience
+    document.getElementById('apiKeyInput').focus();
 }
 
 // Send a message to the AI
