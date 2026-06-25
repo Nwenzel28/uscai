@@ -121,12 +121,18 @@ function appendMessage(text, sender) {
             </div>`;
     } else if (sender === 'bot') {
         div.className = 'flex gap-3 max-w-[85%]';
+        
+        // --- NEW MARKDOWN LOGIC ---
+        // Convert the raw Gemini markdown into HTML using marked.parse()
+        const formattedHTML = marked.parse(text);
+        
+        // Notice the added "prose prose-sm prose-stone max-w-none" classes below
         div.innerHTML = `
             <div class="w-8 h-8 rounded-full bg-[#990000]/10 flex items-center justify-center text-[#990000] shrink-0">
                 <i class="${activeBot.iconClass} text-sm"></i>
             </div>
-            <div class="bg-stone-100 text-stone-800 p-3.5 rounded-2xl rounded-tl-none text-sm shadow-sm whitespace-pre-line">
-                ${text}
+            <div class="bg-stone-100 text-stone-800 p-3.5 rounded-2xl rounded-tl-none text-sm shadow-sm prose prose-sm prose-stone max-w-none">
+                ${formattedHTML}
             </div>`;
     } else if (sender === 'loading') {
         div.className = 'flex gap-3 max-w-[85%] animate-pulse';
