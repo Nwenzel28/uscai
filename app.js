@@ -1,18 +1,37 @@
 // ==========================
 // app.js
-// CORE CHATBOT LOGIC 
+// CORE CHATBOT LOGIC
 // ==========================
+
+// Track the currently active bot (defaults to index 0: CivicBot)
+let currentBotIndex = 0;
 
 // Apply config to UI once the HTML has loaded
 document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('botTitle').innerText = BOT_CONFIG.title;
-    document.getElementById('botIcon').className = BOT_CONFIG.iconClass;
-
+    updateBotUI(); // Initialize the first bot
+    
     // Auto-detect if a key is already saved
     if (localStorage.getItem('gemini_api_key')) {
         document.getElementById('apiKeyInput').placeholder = 'Key already saved. Paste a new one to update it.';
     }
 });
+
+// Function to handle switching bots via the dropdown
+function switchBot() {
+    const selector = document.getElementById('botSelector');
+    currentBotIndex = parseInt(selector.value);
+    updateBotUI();
+    
+    // Have the new bot introduce itself in the chat
+    appendMessage(`Fight On! I am ${BOT_CONFIG[currentBotIndex].title}. How can I help you today?`, 'bot');
+}
+
+// Function to update the title and icon on the screen
+function updateBotUI() {
+    const activeBot = BOT_CONFIG[currentBotIndex];
+    document.getElementById('botTitle').innerText = activeBot.title;
+    document.getElementById('botIcon').className = activeBot.iconClass + ' text-lg';
+}
 
 // Save API key to browser memory
 function saveKey() {
@@ -21,6 +40,7 @@ function saveKey() {
         localStorage.setItem('gemini_api_key', key);
         alert('Key saved. You are ready to go.');
         document.getElementById('apiKeyInput').value = '';
+        document.getElementById('apiKeyInput').placeholder = 'Key already saved. Paste a new one to update it.';
     } else {
         alert('Please paste a valid API key first.');
     }
@@ -54,7 +74,7 @@ async function sendMessage() {
                         { role: 'user', parts: [{ text: userText }] }
                     ],
                     systemInstruction: {
-                        parts: [{ text: BOT_CONFIG.systemPrompt }]
+                        parts: [{ text: BOT_CONFIG[currentBotIndex].systemPrompt }]
                     },
                     generationConfig: {
                         maxOutputTokens: 500,
@@ -76,7 +96,9 @@ async function sendMessage() {
         }
 
     } catch (err) {
-        document.getElementById(loadingId).remove();
+        if (document.getElementById(loadingId)) {
+            document.getElementById(loadingId).remove();
+        }
         appendMessage('Connection error: ' + err.message, 'error');
     }
 }
@@ -87,6 +109,9 @@ function appendMessage(text, sender) {
     const id = 'bubble-' + Date.now();
     const div = document.createElement('div');
     div.id = id;
+    
+    // Grab the active bot configuration for the correct icon
+    const activeBot = BOT_CONFIG[currentBotIndex];
 
     if (sender === 'user') {
         div.className = 'flex justify-end gap-3 max-w-[85%] ml-auto';
@@ -98,7 +123,7 @@ function appendMessage(text, sender) {
         div.className = 'flex gap-3 max-w-[85%]';
         div.innerHTML = `
             <div class="w-8 h-8 rounded-full bg-[#990000]/10 flex items-center justify-center text-[#990000] shrink-0">
-                <i class="${BOT_CONFIG.iconClass} text-sm"></i>
+                <i class="${activeBot.iconClass} text-sm"></i>
             </div>
             <div class="bg-stone-100 text-stone-800 p-3.5 rounded-2xl rounded-tl-none text-sm shadow-sm whitespace-pre-line">
                 ${text}

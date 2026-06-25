@@ -52,6 +52,16 @@
             </p>
         </div>
 
+        <div class="bg-white border border-stone-200 rounded-xl p-4 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <label for="botSelector" class="text-sm font-semibold text-stone-700 flex items-center gap-2">
+                <i class="fa-solid fa-users text-[#990000]"></i> Select Engineering Advisor:
+            </label>
+            <select id="botSelector" onchange="switchBot()" class="w-full sm:w-1/2 border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#990000] bg-stone-50 cursor-pointer">
+                <option value="0">CivicBot (Civil & Env.)</option>
+                <option value="1">BioBot (BME & EE)</option>
+            </select>
+        </div>
+
         <div class="flex-grow bg-white border border-stone-200 rounded-xl shadow-md flex flex-col overflow-hidden min-h-[400px]">
 
             <div class="bg-stone-50 border-b border-stone-200 px-6 py-4 flex items-center gap-3">
@@ -72,7 +82,7 @@
                         <i class="fa-solid fa-robot text-sm"></i>
                     </div>
                     <div class="bg-stone-100 text-stone-800 p-3.5 rounded-2xl rounded-tl-none text-sm">
-                        Fight On! I am your team's engineering advisor bot. Paste your API key above, then ask me anything about our field.
+                        Fight On! I am your team's engineering advisor bot. Paste your API key above, select an advisor, and ask me anything about our field.
                     </div>
                 </div>
             </div>
