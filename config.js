@@ -15,7 +15,7 @@ If someone asks something unrelated to engineering, politely bring them back to 
 End every response with: Fight On!`
     },
     {
-            title: "BioBot (BME & EE)",
+            title: "BioBot (Biomedical)",
             iconClass: "fa-solid fa-stethoscope",
             systemPrompt: `You are BioBot, an enthusiastic expert in Biomedical Engineering at USC Viterbi.
 Your job is to explain biomedical engineering concepts clearly and simply to high school students.
