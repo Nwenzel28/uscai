@@ -4,35 +4,58 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Engineering AI Chatbot - USC Discover Engineering</title>
-    
+
     <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
-    
+    <script>
+        // Brand colors defined once here. Update these two values to re-theme
+        // the entire app instead of hunting for hex codes in every file.
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        cardinal: {
+                            DEFAULT: '#990000',
+                            dark: '#800000'
+                        },
+                        gold: '#FFC72C'
+                    }
+                }
+            }
+        }
+    </script>
+
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    
+
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
-    
+
     <script src="https://cdn.jsdelivr.net/npm/marked-katex-extension/lib/index.umd.js"></script>
-    
+
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@600;700&display=swap');
         body { font-family: 'Inter', sans-serif; }
         h1, h2 { font-family: 'Poppins', sans-serif; }
+
+        /* Hide the native <select> arrow so we can pad for our own icon + chevron */
+        #botSelector {
+            -webkit-appearance: none;
+            appearance: none;
+        }
     </style>
 </head>
 <body class="bg-stone-50 h-screen flex flex-col overflow-hidden">
 
-    <header class="bg-[#990000] text-white py-4 px-6 shadow-md flex justify-between items-center shrink-0">
+    <header class="bg-cardinal text-white py-4 px-6 shadow-md flex justify-between items-center shrink-0">
         <div class="flex items-center gap-3">
-            <i class="fa-solid fa-graduation-cap text-2xl text-[#FFC72C]"></i>
+            <i class="fa-solid fa-graduation-cap text-2xl text-gold"></i>
             <div>
                 <h1 class="text-lg font-bold leading-none">USC Viterbi</h1>
-                <p class="text-xs text-[#FFC72C] font-semibold tracking-wider">DISCOVER ENGINEERING</p>
+                <p class="text-xs text-gold font-semibold tracking-wider">DISCOVER ENGINEERING</p>
             </div>
         </div>
         <div class="text-right">
-            <span class="bg-[#800000] text-xs font-semibold px-3 py-1 rounded-full border border-[#FFC72C]/40">AI Chatbot Project</span>
+            <span class="bg-cardinal-dark text-xs font-semibold px-3 py-1 rounded-full border border-gold/40">AI Chatbot Project</span>
         </div>
     </header>
 
@@ -43,11 +66,12 @@
                 <i class="fa-solid fa-key text-amber-500"></i> Local Credentials
             </h2>
             <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto flex-grow justify-end">
+                <label for="apiKeyInput" class="sr-only">Gemini API key</label>
                 <input
                     type="password"
                     id="apiKeyInput"
                     placeholder="Paste your Gemini API Key here..."
-                    class="w-full sm:max-w-md border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#990000] bg-stone-50"
+                    class="w-full sm:max-w-md border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cardinal bg-stone-50"
                     onkeydown="if(event.key === 'Enter') saveKey()"
                 />
                 <button
@@ -61,56 +85,70 @@
 
         <div class="flex-grow bg-white border border-stone-200 rounded-xl shadow-md flex flex-col overflow-hidden">
 
-            <div class="bg-stone-50 border-b border-stone-200 px-6 py-4 flex items-center gap-3 shrink-0">
-                <div class="w-10 h-10 rounded-full bg-[#990000]/10 flex items-center justify-center text-[#990000]">
-                    <i id="botIcon" class="fa-solid fa-robot text-lg"></i>
-                </div>
-                <div>
-                    <h2 id="botTitle" class="font-bold text-stone-800 text-base">Loading...</h2>
-                    <span class="text-xs text-green-600 font-semibold flex items-center gap-1">
-                        <span class="w-2 h-2 rounded-full bg-green-500 inline-block animate-pulse"></span> Active
-                    </span>
-                </div>
-            </div>
-
             <div id="chatHistory" class="flex-grow p-6 overflow-y-auto space-y-4">
-                <div class="flex gap-3 max-w-[80%]">
-                    <div class="w-8 h-8 rounded-full bg-[#990000]/10 flex items-center justify-center text-[#990000] shrink-0">
+                <div class="flex gap-3 max-w-[85%]">
+                    <div class="w-8 h-8 rounded-full bg-cardinal/10 flex items-center justify-center text-cardinal shrink-0">
                         <i class="fa-solid fa-robot text-sm"></i>
                     </div>
                     <div class="bg-stone-100 text-stone-800 p-3.5 rounded-2xl rounded-tl-none text-sm">
-                        Fight On! I am your team's engineering advisor bot. Ensure your API key is saved, select an advisor below, and ask me anything about our field.
+                        Fight On! I am your team's engineering advisor bot. Ensure your API key is saved, pick an advisor down below, and ask me anything about our field.
                     </div>
                 </div>
             </div>
 
-            <div class="border-t border-stone-200 p-4 bg-stone-50 flex flex-col sm:flex-row gap-2 shrink-0">
-                
-                <button
-                    id="updateKeyBtn"
-                    onclick="showApiKeyPanel()"
-                    class="hidden bg-stone-200 hover:bg-stone-300 text-stone-700 font-medium px-4 py-3 rounded-xl text-sm transition shrink-0 whitespace-nowrap flex items-center justify-center gap-2"
-                >
-                    <i class="fa-solid fa-key text-xs"></i> Update Key
-                </button>
+            <div class="border-t border-stone-200 p-3 bg-stone-50 shrink-0 flex flex-col gap-2">
 
-                <select id="botSelector" onchange="switchBot()" class="w-full sm:w-48 border border-stone-300 rounded-xl px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#990000] bg-white cursor-pointer font-medium text-stone-700 shrink-0">
-                </select>
-                
-                <input
-                    type="text"
-                    id="userInput"
-                    placeholder="Ask a question about our engineering field..."
-                    class="flex-grow border border-stone-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#990000]"
-                    onkeydown="if(event.key === 'Enter') sendMessage()"
-                />
-                
-                <button
-                    onclick="sendMessage()"
-                    class="bg-[#990000] hover:bg-[#800000] text-white font-bold p-3 px-5 rounded-xl text-sm transition duration-150 flex items-center justify-center shrink-0"
-                >
-                    <i class="fa-solid fa-paper-plane"></i>
-                </button>
+                <!-- Key management: only visible once a key has been saved -->
+                <div class="flex justify-end gap-2">
+                    <button
+                        id="updateKeyBtn"
+                        onclick="showApiKeyPanel()"
+                        class="hidden bg-stone-200 hover:bg-stone-300 text-stone-700 font-medium px-3 py-1.5 rounded-lg text-xs transition shrink-0 whitespace-nowrap flex items-center justify-center gap-1.5"
+                    >
+                        <i class="fa-solid fa-key text-xs"></i> Update Key
+                    </button>
+                    <button
+                        id="clearKeyBtn"
+                        onclick="clearKey()"
+                        class="hidden bg-stone-200 hover:bg-red-100 hover:text-red-700 text-stone-700 font-medium px-3 py-1.5 rounded-lg text-xs transition shrink-0 whitespace-nowrap flex items-center justify-center gap-1.5"
+                    >
+                        <i class="fa-solid fa-trash text-xs"></i> Clear Key
+                    </button>
+                </div>
+
+                <!-- Composer: grows with the message, advisor picker + send live in the toolbar row -->
+                <div class="bg-white border border-stone-300 rounded-2xl shadow-sm focus-within:ring-2 focus-within:ring-cardinal transition">
+                    <label for="userInput" class="sr-only">Your message</label>
+                    <textarea
+                        id="userInput"
+                        rows="1"
+                        placeholder="Ask a question about our engineering field..."
+                        class="w-full resize-none bg-transparent px-4 pt-3 pb-1 text-sm focus:outline-none max-h-[140px] overflow-y-auto"
+                        oninput="autoResizeInput()"
+                        onkeydown="handleComposerKeydown(event)"
+                    ></textarea>
+
+                    <div class="flex items-center justify-between px-2 pb-2 pt-1 gap-2">
+                        <div class="relative shrink-0">
+                            <i id="botSelectorIcon" class="fa-solid fa-robot absolute left-2.5 top-1/2 -translate-y-1/2 text-cardinal text-xs pointer-events-none"></i>
+                            <label for="botSelector" class="sr-only">Choose an advisor</label>
+                            <select
+                                id="botSelector"
+                                onchange="switchBot()"
+                                class="w-40 sm:w-48 border border-stone-300 rounded-full pl-7 pr-7 py-1.5 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-cardinal bg-stone-50 cursor-pointer font-medium text-stone-700"
+                            ></select>
+                            <i class="fa-solid fa-chevron-down absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 text-[10px] pointer-events-none"></i>
+                        </div>
+
+                        <button
+                            onclick="sendMessage()"
+                            aria-label="Send message"
+                            class="bg-cardinal hover:bg-cardinal-dark text-white font-bold w-9 h-9 rounded-full text-sm transition duration-150 flex items-center justify-center shrink-0"
+                        >
+                            <i class="fa-solid fa-paper-plane text-xs"></i>
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     </main>

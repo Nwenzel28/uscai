@@ -6,23 +6,28 @@
 // Track the currently active bot (defaults to index 0)
 let currentBotIndex = 0;
 
+// Max height (px) the composer textarea is allowed to grow to before it scrolls.
+// Matches the max-h-[140px] set on #userInput in index.html.
+const COMPOSER_MAX_HEIGHT = 140;
+
 // Apply config to UI once the HTML has loaded
 document.addEventListener('DOMContentLoaded', () => {
-    populateDropdown(); // <-- NEW: Generate the dropdown options first
+    populateDropdown(); // <-- Generate the dropdown options first
     updateBotUI(); // Initialize the first bot
-    
+
     // Auto-detect if a key is already saved and adjust UI
     if (localStorage.getItem('gemini_api_key')) {
         document.getElementById('apiSetupPanel').classList.add('hidden');
         document.getElementById('updateKeyBtn').classList.remove('hidden');
+        document.getElementById('clearKeyBtn').classList.remove('hidden');
     }
 });
 
-// NEW FUNCTION: Dynamically build the dropdown from config.js
+// Dynamically build the dropdown from config.js
 function populateDropdown() {
     const selector = document.getElementById('botSelector');
     selector.innerHTML = ''; // Clear anything currently in the select
-    
+
     BOT_CONFIG.forEach((bot, index) => {
         const option = document.createElement('option');
         option.value = index;
@@ -36,16 +41,19 @@ function switchBot() {
     const selector = document.getElementById('botSelector');
     currentBotIndex = parseInt(selector.value);
     updateBotUI();
-    
+
     // Have the new bot introduce itself in the chat
     appendMessage(`Fight On! I am ${BOT_CONFIG[currentBotIndex].title}. How can I help you today?`, 'bot');
 }
 
-// Function to update the title and icon on the screen
+// Update the advisor icon (now shown inside the composer, not a separate header)
+// and the message placeholder so it's still clear who you're talking to.
 function updateBotUI() {
     const activeBot = BOT_CONFIG[currentBotIndex];
-    document.getElementById('botTitle').innerText = activeBot.title;
-    document.getElementById('botIcon').className = activeBot.iconClass + ' text-lg';
+    document.getElementById('botSelectorIcon').className = activeBot.iconClass + ' absolute left-2.5 top-1/2 -translate-y-1/2 text-cardinal text-xs pointer-events-none';
+
+    const inputField = document.getElementById('userInput');
+    inputField.placeholder = `Ask ${activeBot.title} a question...`;
 }
 
 // Save API key to browser memory
@@ -55,10 +63,11 @@ function saveKey() {
         localStorage.setItem('gemini_api_key', key);
         alert('Key saved. You are ready to go.');
         document.getElementById('apiKeyInput').value = '';
-        
-        // Hide the big top panel, show the small bottom button
+
+        // Hide the big top panel, show the small key-management buttons
         document.getElementById('apiSetupPanel').classList.add('hidden');
         document.getElementById('updateKeyBtn').classList.remove('hidden');
+        document.getElementById('clearKeyBtn').classList.remove('hidden');
     } else {
         alert('Please paste a valid API key first.');
     }
@@ -68,9 +77,40 @@ function saveKey() {
 function showApiKeyPanel() {
     document.getElementById('apiSetupPanel').classList.remove('hidden');
     document.getElementById('updateKeyBtn').classList.add('hidden');
-    
+    document.getElementById('clearKeyBtn').classList.add('hidden');
+
     // Auto-focus the input box for convenience
     document.getElementById('apiKeyInput').focus();
+}
+
+// Remove the saved key entirely (important on shared/lab computers so the
+// next student doesn't inherit your key) and return to the setup state.
+function clearKey() {
+    const confirmed = confirm('Remove the saved API key from this browser? You will need to paste it again to keep chatting.');
+    if (!confirmed) return;
+
+    localStorage.removeItem('gemini_api_key');
+
+    document.getElementById('updateKeyBtn').classList.add('hidden');
+    document.getElementById('clearKeyBtn').classList.add('hidden');
+    document.getElementById('apiSetupPanel').classList.remove('hidden');
+    document.getElementById('apiKeyInput').focus();
+}
+
+// Grow the composer textarea as the user types, up to COMPOSER_MAX_HEIGHT,
+// then let it scroll internally instead of growing further.
+function autoResizeInput() {
+    const textarea = document.getElementById('userInput');
+    textarea.style.height = 'auto';
+    textarea.style.height = Math.min(textarea.scrollHeight, COMPOSER_MAX_HEIGHT) + 'px';
+}
+
+// Enter sends the message; Shift+Enter inserts a newline like most chat apps.
+function handleComposerKeydown(event) {
+    if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        sendMessage();
+    }
 }
 
 // Send a message to the AI
@@ -87,6 +127,7 @@ async function sendMessage() {
 
     appendMessage(userText, 'user');
     inputField.value = '';
+    autoResizeInput(); // collapse the textarea back down after sending
 
     const loadingId = appendMessage('Thinking...', 'loading');
 
@@ -136,28 +177,27 @@ function appendMessage(text, sender) {
     const id = 'bubble-' + Date.now();
     const div = document.createElement('div');
     div.id = id;
-    
+
     // Grab the active bot configuration for the correct icon
     const activeBot = BOT_CONFIG[currentBotIndex];
 
     if (sender === 'user') {
         div.className = 'flex justify-end gap-3 max-w-[85%] ml-auto';
-        div.innerHTML = `
-            <div class="bg-[#990000] text-white p-3.5 rounded-2xl rounded-tr-none text-sm shadow-sm">
-                ${text}
-            </div>`;
+        const bubble = document.createElement('div');
+        bubble.className = 'bg-cardinal text-white p-3.5 rounded-2xl rounded-tr-none text-sm shadow-sm whitespace-pre-wrap';
+        bubble.textContent = text; // textContent, not innerHTML: never let raw user input become markup
+        div.appendChild(bubble);
     } else if (sender === 'bot') {
         div.className = 'flex gap-3 max-w-[85%]';
-        
-        // --- NEW MARKDOWN + MATH LOGIC ---
+
         // Tell marked.js to use the KaTeX extension for math
         marked.use(window.markedKatex({ throwOnError: false }));
-        
+
         // Convert the raw Gemini markdown & LaTeX into HTML
         const formattedHTML = marked.parse(text);
-        
+
         div.innerHTML = `
-            <div class="w-8 h-8 rounded-full bg-[#990000]/10 flex items-center justify-center text-[#990000] shrink-0">
+            <div class="w-8 h-8 rounded-full bg-cardinal/10 flex items-center justify-center text-cardinal shrink-0">
                 <i class="${activeBot.iconClass} text-sm"></i>
             </div>
             <div class="bg-stone-100 text-stone-800 p-3.5 rounded-2xl rounded-tl-none text-sm shadow-sm prose prose-sm prose-stone max-w-none">
@@ -174,11 +214,11 @@ function appendMessage(text, sender) {
             </div>`;
     } else if (sender === 'error') {
         div.className = 'flex justify-center w-full';
-        div.innerHTML = `
-            <div class="bg-red-50 text-red-700 border border-red-200 p-3 rounded-xl text-xs flex items-center gap-2 max-w-[90%]">
-                <i class="fa-solid fa-triangle-exclamation"></i>
-                <span>${text}</span>
-            </div>`;
+        const bubble = document.createElement('div');
+        bubble.className = 'bg-red-50 text-red-700 border border-red-200 p-3 rounded-xl text-xs flex items-center gap-2 max-w-[90%]';
+        bubble.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i><span></span>';
+        bubble.querySelector('span').textContent = text; // textContent: error text may echo API input
+        div.appendChild(bubble);
     }
 
     chatHistory.appendChild(div);
