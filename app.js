@@ -3,11 +3,12 @@
 // CORE CHATBOT LOGIC
 // ==========================
 
-// Track the currently active bot (defaults to index 0: CivicBot)
+// Track the currently active bot (defaults to index 0)
 let currentBotIndex = 0;
 
 // Apply config to UI once the HTML has loaded
 document.addEventListener('DOMContentLoaded', () => {
+    populateDropdown(); // <-- NEW: Generate the dropdown options first
     updateBotUI(); // Initialize the first bot
     
     // Auto-detect if a key is already saved and adjust UI
@@ -16,6 +17,19 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('updateKeyBtn').classList.remove('hidden');
     }
 });
+
+// NEW FUNCTION: Dynamically build the dropdown from config.js
+function populateDropdown() {
+    const selector = document.getElementById('botSelector');
+    selector.innerHTML = ''; // Clear anything currently in the select
+    
+    BOT_CONFIG.forEach((bot, index) => {
+        const option = document.createElement('option');
+        option.value = index;
+        option.textContent = bot.title;
+        selector.appendChild(option);
+    });
+}
 
 // Function to handle switching bots via the dropdown
 function switchBot() {
