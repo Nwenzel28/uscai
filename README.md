@@ -46,14 +46,14 @@ Click Save Key Locally.
 When transitioning to a new engineering discipline each week, your team only needs to modify the parameters in config.js.
 
 Open config.js in a text editor and modify the configuration object:
-
-JavaScript
+```JavaScript
 const BOT_CONFIG = {
     title: "CivicBot (Civil & Env.)",        // Change to your new bot name
     iconClass: "fa-solid fa-helmet-safety",   // Swap FontAwesome icon classes here
 
     systemPrompt: `You are CivicBot, an enthusiastic expert...` // Update persona/rules here
 };
+```
 Tips for Effective System Prompts:
 Role/Persona: Explicitly state who the AI is mimicking (e.g., "You are AeroBot, a passionate Aerospace Engineer at USC...").
 
