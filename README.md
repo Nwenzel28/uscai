@@ -1,6 +1,6 @@
 # ✌️ USC Viterbi Discover Engineering — AI Chatbot Project
 
-Welcome to the **USC Viterbi Discover Engineering AI Chatbot**! This web application is a modular, lightweight, single-page conversational interface powered by the Google Gemini API (`gemini-3.1-flash-lite`). It is specifically designed to serve as an interactive engineering advisor bot for high school students.
+Welcome to our group's **USC Viterbi Discover Engineering AI Chatbot**! This web application is a modular, lightweight, single-page conversational interface powered by the Google Gemini API (`gemini-3.1-flash-lite`). It is specifically designed to serve as an interactive engineering advisor bot for high school students.
 
 By splitting the codebase into three distinct layers, the project enforces a clean **Separation of Concerns (SoC)**, allowing team members to update bot personas weekly without risking breakages to the underlying core system logic.
 
@@ -16,10 +16,10 @@ The application is split into three main files located in the same directory:
 └── app.js         # The Application Logic (API integrations & UI manipulation)
 ```
 1. Presentation Layer (index.html)
-Handles the visual structure, layout, and responsive design using Tailwind CSS utility classes. It mirrors USC's official branding with cardinal (#990000) and gold (#FFC72C) accents. It acts as a passive layout shell that imports the behavioral scripts at the bottom of the document.
+Handles the visual structure, layout, and responsive design using Tailwind CSS utility classes. Mirrors USC's official branding with cardinal (#990000) and gold (#FFC72C) accents. It acts as a passive layout shell that imports the behavioral scripts at the bottom of the document.
 
 2. Configuration Layer (config.js)
-Contains the BOT_CONFIG global object. This is the only file your team needs to edit weekly. It dictates the bot's display name, FontAwesome icon, and its specific behavioral prompt boundaries.
+Contains the BOT_CONFIG global object. This is the only file that needs to be edited to change the behaviour of the Bots. It dictates the bot's display name, FontAwesome icon, and its specific behavioral prompt boundaries.
 
 3. Logic Layer (app.js)
 The "engine" of the application. It handles DOMContentLoaded initialization, interacts with browser localStorage to preserve API keys securely, makes POST requests to the Gemini API, and dynamically handles state changes (loading bubbles, user chat bubbles, and structured bot responses).
@@ -27,10 +27,10 @@ The "engine" of the application. It handles DOMContentLoaded initialization, int
 ## 🚀 How to Set Up and Run Locally
 Because this project relies entirely on client-side native JavaScript, you do not need to install Node.js, npm, or run complex developer environments.
 
-Step 1: Clone or Save the Files
+Step 1: Clone or Save the Files **OR** Use This Repository's Github Pages Link (nwenzel28.github.io/uscai)
 Ensure that index.html, config.js, and app.js are all saved in the exact same folder.
 
-Step 2: Open the Application
+Step 2: Open the Application (No need if using Github Pages)
 Simply double-click the index.html file to open it directly inside any modern web browser (Chrome, Safari, Edge, or Firefox). Alternatively, if you use VS Code, you can right-click index.html and select Open with Live Server.
 
 Step 3: Insert Your API Credentials
