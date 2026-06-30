@@ -3,21 +3,54 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Engineering AI Chatbot - USC Discover Engineering</title>
+    <title>Engineering AI Chatbot – USC Discover Engineering</title>
 
     <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
     <script>
-        // Brand colors defined once here. Update these two values to re-theme
-        // the entire app instead of hunting for hex codes in every file.
+        // ─────────────────────────────────────────────────────────────────
+        // USC Brand Colors — change hex values here to re-theme the app.
+        // Source: https://identity.usc.edu/visual-identity/color/
+        //
+        // USC Cardinal  PMS 201 C  C7 M100 Y65 K32  R153 G0 B0
+        //   IMPORTANT: tints of cardinal are NOT permitted per brand guide.
+        //   Only approved shades (+K) are listed below.
+        //
+        // USC Gold  PMS 123 C  C0 M27 Y100 K0  R255 G204 B0
+        //   Tints at 75%, 50%, and 25% are permitted.
+        //   Shades of gold are NOT permitted per brand guide.
+        //
+        // Secondary: black (#000000), white (#ffffff),
+        //   gray-30k (#cccccc, on black), gray-70k (#767676, on white).
+        //
+        // Tertiary colors are for graphic accents only — not substitutes
+        // for cardinal or gold in primary UI elements.
+        // ─────────────────────────────────────────────────────────────────
         tailwind.config = {
             theme: {
                 extend: {
                     colors: {
+                        // Primary
                         cardinal: {
-                            DEFAULT: '#990000',
-                            dark: '#800000'
+                            DEFAULT: '#990000', // PMS 201 C — base cardinal
+                            '10k':   '#8A0000', // +10K shade (approved)
+                            '20k':   '#7A0000', // +20K shade (approved)
+                            '30k':   '#6B0000', // +30K shade (approved)
                         },
-                        gold: '#FFC72C'
+                        gold: '#FFCC00',         // PMS 123 C — USC Gold
+
+                        // Secondary
+                        'usc-gray-30': '#CCCCCC', // 30K — ADA tint on black
+                        'usc-gray-70': '#767676', // 70K — ADA tint on white
+
+                        // Tertiary (graphic / accent use only)
+                        'usc-salmon': '#F2C6A7', // PMS 474 C
+                        'usc-rose':   '#F26178', // PMS 709 C
+                        'usc-blue':   '#2B5597', // PMS 7685 C
+                        'usc-olive':  '#908C13', // PMS 582 C
+                        'usc-yellow': '#FDE021', // PMS 107 C
+                        'usc-lime':   '#DAE343', // PMS 380 C
+                        'usc-orange': '#FF9015', // PMS 1495 C
+                        'usc-red':    '#E43D30', // PMS 179 C
                     }
                 }
             }
@@ -25,136 +58,133 @@
     </script>
 
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
-
     <script src="https://cdn.jsdelivr.net/npm/marked-katex-extension/lib/index.umd.js"></script>
-
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@600;700&display=swap');
         body { font-family: 'Inter', sans-serif; }
-        h1, h2 { font-family: 'Poppins', sans-serif; }
-
-        /* Hide the native <select> arrow so we can pad for our own icon + chevron */
-        #botSelector {
-            -webkit-appearance: none;
-            appearance: none;
+        #botSelector { -webkit-appearance: none; appearance: none; }
+        .sr-only {
+            position: absolute; width: 1px; height: 1px;
+            padding: 0; margin: -1px; overflow: hidden;
+            clip: rect(0,0,0,0); white-space: nowrap; border-width: 0;
         }
     </style>
 </head>
 <body class="bg-stone-50 h-screen flex flex-col overflow-hidden">
 
-    <header class="bg-cardinal text-white py-4 px-6 shadow-md flex justify-between items-center shrink-0">
+    <!-- Header: thin, brand present but not heavy -->
+    <header class="bg-cardinal text-white py-3 px-6 flex items-center justify-between shrink-0">
         <div class="flex items-center gap-3">
-            <i class="fa-solid fa-graduation-cap text-2xl text-gold"></i>
-            <div>
-                <h1 class="text-lg font-bold leading-none">USC Viterbi</h1>
-                <p class="text-xs text-gold font-semibold tracking-wider">DISCOVER ENGINEERING</p>
+            <i class="fa-solid fa-graduation-cap text-xl text-gold" aria-hidden="true"></i>
+            <div class="flex items-baseline gap-2">
+                <span class="font-bold text-sm">USC Viterbi</span>
+                <span class="text-xs text-gold/90 font-semibold tracking-wider hidden sm:inline">DISCOVER ENGINEERING</span>
             </div>
         </div>
-        <div class="text-right">
-            <span class="bg-cardinal-dark text-xs font-semibold px-3 py-1 rounded-full border border-gold/40">AI Chatbot Project</span>
-        </div>
+        <button
+            id="settingsBtn"
+            onclick="toggleSettings()"
+            aria-label="API key settings"
+            class="w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center transition"
+        >
+            <i id="settingsIcon" class="fa-solid fa-key text-sm text-gold/90"></i>
+        </button>
     </header>
 
-    <main class="flex-grow max-w-6xl w-full mx-auto p-4 flex flex-col gap-4 h-full overflow-hidden">
-
-        <div id="apiSetupPanel" class="bg-white border border-stone-200 rounded-xl p-4 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shrink-0">
-            <h2 class="text-sm font-semibold text-stone-700 whitespace-nowrap flex items-center gap-2">
-                <i class="fa-solid fa-key text-amber-500"></i> Local Credentials
-            </h2>
-            <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto flex-grow justify-end">
-                <label for="apiKeyInput" class="sr-only">Gemini API key</label>
-                <input
-                    type="password"
-                    id="apiKeyInput"
-                    placeholder="Paste your Gemini API Key here..."
-                    class="w-full sm:max-w-md border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cardinal bg-stone-50"
-                    onkeydown="if(event.key === 'Enter') saveKey()"
-                />
-                <button
-                    onclick="saveKey()"
-                    class="bg-stone-800 hover:bg-stone-900 text-white font-medium px-4 py-2 rounded-lg text-sm transition shrink-0"
-                >
-                    Save Key Locally
-                </button>
-            </div>
+    <!-- Credentials panel: compact bar, not a separate card competing with the chat -->
+    <div id="settingsPanel" class="bg-white border-b border-stone-200 shrink-0">
+        <div class="max-w-2xl mx-auto px-4 py-2.5 flex items-center gap-2">
+            <i class="fa-solid fa-key text-stone-400 text-xs shrink-0" aria-hidden="true"></i>
+            <label for="apiKeyInput" class="sr-only">Gemini API key</label>
+            <input
+                type="password"
+                id="apiKeyInput"
+                placeholder="Paste your Gemini API key here…"
+                class="flex-grow border border-stone-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-cardinal bg-stone-50 min-w-0"
+                onkeydown="if(event.key === 'Enter') saveKey()"
+            />
+            <button
+                onclick="saveKey()"
+                class="bg-stone-800 hover:bg-stone-900 text-white font-medium px-3 py-1.5 rounded-lg text-sm transition shrink-0"
+            >Save key</button>
+            <button
+                id="clearKeyBtn"
+                onclick="clearKey()"
+                class="hidden text-stone-400 hover:text-red-600 text-sm transition flex items-center gap-1.5 shrink-0 whitespace-nowrap"
+            >
+                <i class="fa-solid fa-trash text-xs" aria-hidden="true"></i> Clear
+            </button>
         </div>
+    </div>
 
-        <div class="flex-grow bg-white border border-stone-200 rounded-xl shadow-md flex flex-col overflow-hidden">
+    <!-- Main: no card, no border — the chat IS the page -->
+    <main class="flex-grow overflow-hidden flex flex-col">
+        <div class="flex-grow max-w-2xl w-full mx-auto flex flex-col overflow-hidden">
 
-            <div id="chatHistory" class="flex-grow p-6 overflow-y-auto space-y-4">
-                <div class="flex gap-3 max-w-[85%]">
-                    <div class="w-8 h-8 rounded-full bg-cardinal/10 flex items-center justify-center text-cardinal shrink-0">
-                        <i class="fa-solid fa-robot text-sm"></i>
+            <!-- Chat history scrolls here; no white card wrapper -->
+            <div
+                id="chatHistory"
+                class="flex-grow py-6 px-4 overflow-y-auto space-y-5"
+                aria-live="polite"
+                aria-label="Conversation"
+            >
+                <!-- Static welcome message (icon updated on load by JS) -->
+                <div class="flex gap-3">
+                    <div class="w-7 h-7 rounded-full bg-gold/30 flex items-center justify-center text-cardinal shrink-0 mt-0.5">
+                        <i id="welcomeIcon" class="fa-solid fa-robot text-xs" aria-hidden="true"></i>
                     </div>
-                    <div class="bg-stone-100 text-stone-800 p-3.5 rounded-2xl rounded-tl-none text-sm">
-                        Fight On! I am your team's engineering advisor bot. Ensure your API key is saved, pick an advisor down below, and ask me anything about our field.
+                    <div class="bg-white border border-stone-200 text-stone-800 px-4 py-3 rounded-2xl rounded-tl-sm text-sm leading-relaxed max-w-[85%]">
+                        Fight On! I'm your engineering advisor. Save your API key above, pick an advisor below, and ask me anything about the field.
                     </div>
                 </div>
             </div>
 
-            <div class="border-t border-stone-200 p-3 bg-stone-50 shrink-0 flex flex-col gap-2">
-
-                <!-- Key management: only visible once a key has been saved -->
-                <div class="flex justify-end gap-2">
-                    <button
-                        id="updateKeyBtn"
-                        onclick="showApiKeyPanel()"
-                        class="hidden bg-stone-200 hover:bg-stone-300 text-stone-700 font-medium px-3 py-1.5 rounded-lg text-xs transition shrink-0 whitespace-nowrap flex items-center justify-center gap-1.5"
-                    >
-                        <i class="fa-solid fa-key text-xs"></i> Update Key
-                    </button>
-                    <button
-                        id="clearKeyBtn"
-                        onclick="clearKey()"
-                        class="hidden bg-stone-200 hover:bg-red-100 hover:text-red-700 text-stone-700 font-medium px-3 py-1.5 rounded-lg text-xs transition shrink-0 whitespace-nowrap flex items-center justify-center gap-1.5"
-                    >
-                        <i class="fa-solid fa-trash text-xs"></i> Clear Key
-                    </button>
-                </div>
-
-                <!-- Composer: grows with the message, advisor picker + send live in the toolbar row -->
-                <div class="bg-white border border-stone-300 rounded-2xl shadow-sm focus-within:ring-2 focus-within:ring-cardinal transition">
+            <!-- Composer: anchored to the bottom, blends into the page bg -->
+            <div class="px-4 pb-4 pt-1 shrink-0">
+                <div class="bg-white border border-stone-200 rounded-2xl shadow-sm focus-within:ring-2 focus-within:ring-cardinal transition">
                     <label for="userInput" class="sr-only">Your message</label>
                     <textarea
                         id="userInput"
                         rows="1"
-                        placeholder="Ask a question about our engineering field..."
+                        placeholder="Ask a question about engineering…"
                         class="w-full resize-none bg-transparent px-4 pt-3 pb-1 text-sm focus:outline-none max-h-[140px] overflow-y-auto"
                         oninput="autoResizeInput()"
                         onkeydown="handleComposerKeydown(event)"
                     ></textarea>
 
                     <div class="flex items-center justify-between px-2 pb-2 pt-1 gap-2">
+                        <!-- Advisor picker -->
                         <div class="relative shrink-0">
-                            <i id="botSelectorIcon" class="fa-solid fa-robot absolute left-2.5 top-1/2 -translate-y-1/2 text-cardinal text-xs pointer-events-none"></i>
+                            <i id="botSelectorIcon" class="fa-solid fa-robot absolute left-2.5 top-1/2 -translate-y-1/2 text-cardinal text-xs pointer-events-none" aria-hidden="true"></i>
                             <label for="botSelector" class="sr-only">Choose an advisor</label>
                             <select
                                 id="botSelector"
                                 onchange="switchBot()"
-                                class="w-40 sm:w-48 border border-stone-300 rounded-full pl-7 pr-7 py-1.5 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-cardinal bg-stone-50 cursor-pointer font-medium text-stone-700"
+                                class="w-36 sm:w-44 border border-stone-300 rounded-full pl-7 pr-6 py-1.5 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-cardinal bg-stone-50 cursor-pointer font-medium text-stone-700"
                             ></select>
-                            <i class="fa-solid fa-chevron-down absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 text-[10px] pointer-events-none"></i>
+                            <i class="fa-solid fa-chevron-down absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 text-[10px] pointer-events-none" aria-hidden="true"></i>
                         </div>
 
+                        <!-- Send -->
                         <button
                             onclick="sendMessage()"
                             aria-label="Send message"
-                            class="bg-cardinal hover:bg-cardinal-dark text-white font-bold w-9 h-9 rounded-full text-sm transition duration-150 flex items-center justify-center shrink-0"
+                            class="bg-stone-800 hover:bg-stone-900 text-white w-9 h-9 rounded-full text-sm transition duration-150 flex items-center justify-center shrink-0"
                         >
-                            <i class="fa-solid fa-paper-plane text-xs"></i>
+                            <i class="fa-solid fa-paper-plane text-xs" aria-hidden="true"></i>
                         </button>
                     </div>
                 </div>
             </div>
+
         </div>
     </main>
 
     <script src="config.js"></script>
     <script src="app.js"></script>
-
 </body>
 </html>

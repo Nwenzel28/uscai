@@ -1,227 +1,216 @@
 // ==========================
-// app.js
-// CORE CHATBOT LOGIC
+// app.js  –  core chat logic
 // ==========================
 
-// Track the currently active bot (defaults to index 0)
 let currentBotIndex = 0;
 
-// Max height (px) the composer textarea is allowed to grow to before it scrolls.
-// Matches the max-h-[140px] set on #userInput in index.html.
+// Matches max-h-[140px] on #userInput
 const COMPOSER_MAX_HEIGHT = 140;
 
-// Apply config to UI once the HTML has loaded
 document.addEventListener('DOMContentLoaded', () => {
-    populateDropdown(); // <-- Generate the dropdown options first
-    updateBotUI(); // Initialize the first bot
+    populateDropdown();
+    updateBotUI();
 
-    // Auto-detect if a key is already saved and adjust UI
-    if (localStorage.getItem('gemini_api_key')) {
-        document.getElementById('apiSetupPanel').classList.add('hidden');
-        document.getElementById('updateKeyBtn').classList.remove('hidden');
-        document.getElementById('clearKeyBtn').classList.remove('hidden');
+    const hasKey = !!localStorage.getItem('gemini_api_key');
+    const panel  = document.getElementById('settingsPanel');
+    const clear  = document.getElementById('clearKeyBtn');
+    const icon   = document.getElementById('settingsIcon');
+
+    if (hasKey) {
+        panel.classList.add('hidden');
+        clear.classList.remove('hidden');
+        icon.className = 'fa-solid fa-key text-sm text-white/40';
+    } else {
+        // No key yet — keep panel visible so the user knows to set one
+        panel.classList.remove('hidden');
+        clear.classList.add('hidden');
+        icon.className = 'fa-solid fa-key text-sm text-gold/90';
     }
 });
 
-// Dynamically build the dropdown from config.js
+// Build the advisor dropdown from config.js
 function populateDropdown() {
-    const selector = document.getElementById('botSelector');
-    selector.innerHTML = ''; // Clear anything currently in the select
-
-    BOT_CONFIG.forEach((bot, index) => {
-        const option = document.createElement('option');
-        option.value = index;
-        option.textContent = bot.title;
-        selector.appendChild(option);
+    const sel = document.getElementById('botSelector');
+    sel.innerHTML = '';
+    BOT_CONFIG.forEach((bot, i) => {
+        const opt = document.createElement('option');
+        opt.value = i;
+        opt.textContent = bot.title;
+        sel.appendChild(opt);
     });
 }
 
-// Function to handle switching bots via the dropdown
-function switchBot() {
-    const selector = document.getElementById('botSelector');
-    currentBotIndex = parseInt(selector.value);
-    updateBotUI();
-
-    // Have the new bot introduce itself in the chat
-    appendMessage(`Fight On! I am ${BOT_CONFIG[currentBotIndex].title}. How can I help you today?`, 'bot');
-}
-
-// Update the advisor icon (now shown inside the composer, not a separate header)
-// and the message placeholder so it's still clear who you're talking to.
+// Sync icon + placeholder to whichever advisor is active
 function updateBotUI() {
-    const activeBot = BOT_CONFIG[currentBotIndex];
-    document.getElementById('botSelectorIcon').className = activeBot.iconClass + ' absolute left-2.5 top-1/2 -translate-y-1/2 text-cardinal text-xs pointer-events-none';
-
-    const inputField = document.getElementById('userInput');
-    inputField.placeholder = `Ask ${activeBot.title} a question...`;
+    const bot = BOT_CONFIG[currentBotIndex];
+    document.getElementById('botSelectorIcon').className =
+        bot.iconClass + ' absolute left-2.5 top-1/2 -translate-y-1/2 text-cardinal text-xs pointer-events-none';
+    document.getElementById('welcomeIcon').className =
+        bot.iconClass + ' text-xs';
+    document.getElementById('userInput').placeholder =
+        `Ask ${bot.title} a question…`;
 }
 
-// Save API key to browser memory
-function saveKey() {
-    const key = document.getElementById('apiKeyInput').value.trim();
-    if (key) {
-        localStorage.setItem('gemini_api_key', key);
-        alert('Key saved. You are ready to go.');
-        document.getElementById('apiKeyInput').value = '';
+// Switch advisors
+function switchBot() {
+    currentBotIndex = parseInt(document.getElementById('botSelector').value);
+    updateBotUI();
+    appendMessage(
+        `Fight On! I'm ${BOT_CONFIG[currentBotIndex].title}. How can I help you today?`,
+        'bot'
+    );
+}
 
-        // Hide the big top panel, show the small key-management buttons
-        document.getElementById('apiSetupPanel').classList.add('hidden');
-        document.getElementById('updateKeyBtn').classList.remove('hidden');
-        document.getElementById('clearKeyBtn').classList.remove('hidden');
-    } else {
-        alert('Please paste a valid API key first.');
+// Toggle the settings/credentials bar
+function toggleSettings() {
+    const panel = document.getElementById('settingsPanel');
+    const isHidden = panel.classList.toggle('hidden');
+    if (!isHidden) {
+        setTimeout(() => document.getElementById('apiKeyInput').focus(), 50);
     }
 }
 
-// Show the API key setup panel again if the user wants to update it
-function showApiKeyPanel() {
-    document.getElementById('apiSetupPanel').classList.remove('hidden');
-    document.getElementById('updateKeyBtn').classList.add('hidden');
-    document.getElementById('clearKeyBtn').classList.add('hidden');
-
-    // Auto-focus the input box for convenience
-    document.getElementById('apiKeyInput').focus();
+// Save key to localStorage and close the panel
+function saveKey() {
+    const key = document.getElementById('apiKeyInput').value.trim();
+    if (!key) {
+        alert('Please paste a valid API key first.');
+        return;
+    }
+    localStorage.setItem('gemini_api_key', key);
+    document.getElementById('apiKeyInput').value = '';
+    document.getElementById('settingsPanel').classList.add('hidden');
+    document.getElementById('clearKeyBtn').classList.remove('hidden');
+    document.getElementById('settingsIcon').className =
+        'fa-solid fa-key text-sm text-white/40';
 }
 
-// Remove the saved key entirely (important on shared/lab computers so the
-// next student doesn't inherit your key) and return to the setup state.
+// Remove the key and reopen the panel — important on shared/lab computers
 function clearKey() {
-    const confirmed = confirm('Remove the saved API key from this browser? You will need to paste it again to keep chatting.');
-    if (!confirmed) return;
-
+    if (!confirm("Remove the saved API key from this browser? You'll need to paste it again to keep chatting.")) return;
     localStorage.removeItem('gemini_api_key');
-
-    document.getElementById('updateKeyBtn').classList.add('hidden');
     document.getElementById('clearKeyBtn').classList.add('hidden');
-    document.getElementById('apiSetupPanel').classList.remove('hidden');
-    document.getElementById('apiKeyInput').focus();
+    document.getElementById('settingsPanel').classList.remove('hidden');
+    document.getElementById('settingsIcon').className =
+        'fa-solid fa-key text-sm text-gold/90';
+    setTimeout(() => document.getElementById('apiKeyInput').focus(), 50);
 }
 
-// Grow the composer textarea as the user types, up to COMPOSER_MAX_HEIGHT,
-// then let it scroll internally instead of growing further.
+// Grow the textarea as the user types; collapse on send
 function autoResizeInput() {
-    const textarea = document.getElementById('userInput');
-    textarea.style.height = 'auto';
-    textarea.style.height = Math.min(textarea.scrollHeight, COMPOSER_MAX_HEIGHT) + 'px';
+    const ta = document.getElementById('userInput');
+    ta.style.height = 'auto';
+    ta.style.height = Math.min(ta.scrollHeight, COMPOSER_MAX_HEIGHT) + 'px';
 }
 
-// Enter sends the message; Shift+Enter inserts a newline like most chat apps.
-function handleComposerKeydown(event) {
-    if (event.key === 'Enter' && !event.shiftKey) {
-        event.preventDefault();
+// Enter sends; Shift+Enter inserts a newline
+function handleComposerKeydown(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
         sendMessage();
     }
 }
 
-// Send a message to the AI
+// Send a message to the Gemini API
 async function sendMessage() {
     const apiKey = localStorage.getItem('gemini_api_key');
     if (!apiKey) {
-        alert('Please paste your Gemini API key into the credentials panel first.');
+        // Nudge the user to set the key rather than throwing a bare alert
+        document.getElementById('settingsPanel').classList.remove('hidden');
+        document.getElementById('apiKeyInput').focus();
         return;
     }
 
-    const inputField = document.getElementById('userInput');
-    const userText = inputField.value.trim();
+    const input    = document.getElementById('userInput');
+    const userText = input.value.trim();
     if (!userText) return;
 
     appendMessage(userText, 'user');
-    inputField.value = '';
-    autoResizeInput(); // collapse the textarea back down after sending
+    input.value = '';
+    autoResizeInput();
 
-    const loadingId = appendMessage('Thinking...', 'loading');
+    const loadingId = appendMessage('Thinking…', 'loading');
 
     try {
-        const response = await fetch(
+        const res = await fetch(
             `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${apiKey}`,
             {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    contents: [
-                        { role: 'user', parts: [{ text: userText }] }
-                    ],
-                    systemInstruction: {
-                        parts: [{ text: BOT_CONFIG[currentBotIndex].systemPrompt }]
-                    },
-                    generationConfig: {
-                        maxOutputTokens: 500,
-                        temperature: 0.7
-                    }
+                    contents: [{ role: 'user', parts: [{ text: userText }] }],
+                    systemInstruction: { parts: [{ text: BOT_CONFIG[currentBotIndex].systemPrompt }] },
+                    generationConfig: { maxOutputTokens: 500, temperature: 0.7 }
                 })
             }
         );
 
-        const data = await response.json();
-        document.getElementById(loadingId).remove();
+        const data = await res.json();
+        const loadingEl = document.getElementById(loadingId);
+        if (loadingEl) loadingEl.remove();
 
-        if (response.ok) {
-            const replyText = data.candidates[0].content.parts[0].text;
-            appendMessage(replyText, 'bot');
+        if (res.ok) {
+            const reply = data.candidates[0].content.parts[0].text;
+            appendMessage(reply, 'bot');
         } else {
-            const errMsg = data.error ? data.error.message : 'Unknown error.';
-            appendMessage('Error: ' + errMsg, 'error');
+            appendMessage('Error: ' + (data.error?.message ?? 'Unknown error'), 'error');
         }
-
     } catch (err) {
-        if (document.getElementById(loadingId)) {
-            document.getElementById(loadingId).remove();
-        }
+        const loadingEl = document.getElementById(loadingId);
+        if (loadingEl) loadingEl.remove();
         appendMessage('Connection error: ' + err.message, 'error');
     }
 }
 
-// Render a message bubble
+// Render a message bubble and scroll the chat into view
 function appendMessage(text, sender) {
-    const chatHistory = document.getElementById('chatHistory');
-    const id = 'bubble-' + Date.now();
-    const div = document.createElement('div');
-    div.id = id;
+    const history = document.getElementById('chatHistory');
+    const id      = 'bubble-' + Date.now();
+    const row     = document.createElement('div');
+    row.id = id;
 
-    // Grab the active bot configuration for the correct icon
-    const activeBot = BOT_CONFIG[currentBotIndex];
+    const bot = BOT_CONFIG[currentBotIndex];
 
     if (sender === 'user') {
-        div.className = 'flex justify-end gap-3 max-w-[85%] ml-auto';
+        row.className = 'flex justify-end';
         const bubble = document.createElement('div');
-        bubble.className = 'bg-cardinal text-white p-3.5 rounded-2xl rounded-tr-none text-sm shadow-sm whitespace-pre-wrap';
-        bubble.textContent = text; // textContent, not innerHTML: never let raw user input become markup
-        div.appendChild(bubble);
+        // Dark stone bubble for the user — cardinal is reserved for the header/brand.
+        bubble.className = 'bg-stone-800 text-white px-4 py-3 rounded-2xl rounded-tr-sm text-sm leading-relaxed whitespace-pre-wrap max-w-[85%]';
+        bubble.textContent = text; // textContent: never allow raw user input to become markup
+        row.appendChild(bubble);
+
     } else if (sender === 'bot') {
-        div.className = 'flex gap-3 max-w-[85%]';
-
-        // Tell marked.js to use the KaTeX extension for math
+        row.className = 'flex gap-3';
         marked.use(window.markedKatex({ throwOnError: false }));
-
-        // Convert the raw Gemini markdown & LaTeX into HTML
-        const formattedHTML = marked.parse(text);
-
-        div.innerHTML = `
-            <div class="w-8 h-8 rounded-full bg-cardinal/10 flex items-center justify-center text-cardinal shrink-0">
-                <i class="${activeBot.iconClass} text-sm"></i>
+        const formatted = marked.parse(text);
+        row.innerHTML = `
+            <div class="w-7 h-7 rounded-full bg-gold/30 flex items-center justify-center text-cardinal shrink-0 mt-0.5" aria-hidden="true">
+                <i class="${bot.iconClass} text-xs"></i>
             </div>
-            <div class="bg-stone-100 text-stone-800 p-3.5 rounded-2xl rounded-tl-none text-sm shadow-sm prose prose-sm prose-stone max-w-none">
-                ${formattedHTML}
+            <div class="bg-white border border-stone-200 text-stone-800 px-4 py-3 rounded-2xl rounded-tl-sm text-sm leading-relaxed max-w-[85%]">
+                <div class="prose prose-sm prose-stone max-w-none">${formatted}</div>
             </div>`;
+
     } else if (sender === 'loading') {
-        div.className = 'flex gap-3 max-w-[85%] animate-pulse';
-        div.innerHTML = `
-            <div class="w-8 h-8 rounded-full bg-stone-200 flex items-center justify-center text-stone-400 shrink-0">
-                <i class="fa-solid fa-spinner animate-spin text-sm"></i>
+        row.className = 'flex gap-3 animate-pulse';
+        row.innerHTML = `
+            <div class="w-7 h-7 rounded-full bg-stone-200 flex items-center justify-center text-stone-400 shrink-0 mt-0.5" aria-hidden="true">
+                <i class="fa-solid fa-spinner animate-spin text-xs"></i>
             </div>
-            <div class="bg-stone-100 text-stone-500 p-3 rounded-2xl rounded-tl-none text-sm italic">
+            <div class="bg-white border border-stone-200 text-stone-400 px-4 py-3 rounded-2xl rounded-tl-sm text-sm italic">
                 ${text}
             </div>`;
+
     } else if (sender === 'error') {
-        div.className = 'flex justify-center w-full';
-        const bubble = document.createElement('div');
-        bubble.className = 'bg-red-50 text-red-700 border border-red-200 p-3 rounded-xl text-xs flex items-center gap-2 max-w-[90%]';
-        bubble.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i><span></span>';
-        bubble.querySelector('span').textContent = text; // textContent: error text may echo API input
-        div.appendChild(bubble);
+        row.className = 'flex justify-center';
+        const pill = document.createElement('div');
+        pill.className = 'bg-red-50 text-red-700 border border-red-200 px-4 py-2 rounded-xl text-xs flex items-center gap-2';
+        pill.innerHTML = '<i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><span></span>';
+        pill.querySelector('span').textContent = text; // textContent: keep error text safe
+        row.appendChild(pill);
     }
 
-    chatHistory.appendChild(div);
-    chatHistory.scrollTop = chatHistory.scrollHeight;
+    history.appendChild(row);
+    history.scrollTop = history.scrollHeight;
     return id;
 }
