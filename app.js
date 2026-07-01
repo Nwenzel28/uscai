@@ -3,13 +3,62 @@
 // ==========================
 
 let currentBotIndex = 0;
+let isSending = false;
 
 // Matches max-h-[140px] on #userInput
 const COMPOSER_MAX_HEIGHT = 140;
 
+function getChatContainer() {
+    return document.getElementById('chatHistory');
+}
+
+function getChatMessageStream() {
+    return document.getElementById('chatStream') || getChatContainer();
+}
+
+function setSendButtonState(disabled) {
+    const btn = document.getElementById('sendBtn');
+    if (!btn) return;
+
+    btn.disabled = disabled;
+    btn.classList.toggle('opacity-60', disabled);
+    btn.classList.toggle('cursor-not-allowed', disabled);
+    btn.setAttribute('aria-busy', String(disabled));
+}
+
+function setComposerBusy(busy) {
+    const input = document.getElementById('userInput');
+    if (!input) return;
+
+    input.disabled = busy;
+    setSendButtonState(busy);
+}
+
+function sanitizeRenderedHTML(html) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(`<div>${html}</div>`, 'text/html');
+    const root = doc.body.firstElementChild;
+    if (!root) return html;
+
+    const forbidden = ['script', 'style', 'iframe', 'object', 'embed'];
+    forbidden.forEach((tag) => root.querySelectorAll(tag).forEach((el) => el.remove()));
+
+    root.querySelectorAll('*').forEach((el) => {
+        [...el.attributes].forEach((attr) => {
+            if (/^on/i.test(attr.name)) el.removeAttribute(attr.name);
+        });
+    });
+
+    return root.innerHTML;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     populateDropdown();
     updateBotUI();
+
+    if (window.marked && window.markedKatex) {
+        marked.use(window.markedKatex({ throwOnError: false }));
+    }
 
     const hasKey = !!localStorage.getItem('gemini_api_key');
     const panel  = document.getElementById('settingsPanel');
@@ -26,6 +75,8 @@ document.addEventListener('DOMContentLoaded', () => {
         clear.classList.add('hidden');
         icon.className = 'fa-solid fa-key text-sm text-gold/90';
     }
+
+    setSendButtonState(false);
 });
 
 // Build the advisor dropdown from config.js
@@ -53,7 +104,7 @@ function updateBotUI() {
 
 // Switch advisors
 function switchBot() {
-    currentBotIndex = parseInt(document.getElementById('botSelector').value);
+    currentBotIndex = Number.parseInt(document.getElementById('botSelector').value, 10) || 0;
     updateBotUI();
     appendMessage(
         `Fight On! I'm ${BOT_CONFIG[currentBotIndex].title}. How can I help you today?`,
@@ -113,6 +164,8 @@ function handleComposerKeydown(e) {
 
 // Send a message to the Gemini API
 async function sendMessage() {
+    if (isSending) return;
+
     const apiKey = localStorage.getItem('gemini_api_key');
     if (!apiKey) {
         // Nudge the user to set the key rather than throwing a bare alert
@@ -124,6 +177,9 @@ async function sendMessage() {
     const input    = document.getElementById('userInput');
     const userText = input.value.trim();
     if (!userText) return;
+
+    isSending = true;
+    setComposerBusy(true);
 
     appendMessage(userText, 'user');
     input.value = '';
@@ -150,8 +206,8 @@ async function sendMessage() {
         if (loadingEl) loadingEl.remove();
 
         if (res.ok) {
-            const reply = data.candidates[0].content.parts[0].text;
-            appendMessage(reply, 'bot');
+            const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+            appendMessage(reply || 'Sorry — I could not generate a response this time.', 'bot');
         } else {
             appendMessage('Error: ' + (data.error?.message ?? 'Unknown error'), 'error');
         }
@@ -159,12 +215,17 @@ async function sendMessage() {
         const loadingEl = document.getElementById(loadingId);
         if (loadingEl) loadingEl.remove();
         appendMessage('Connection error: ' + err.message, 'error');
+    } finally {
+        isSending = false;
+        setComposerBusy(false);
+        input.focus();
     }
 }
 
 // Render a message bubble and scroll the chat into view
 function appendMessage(text, sender) {
-    const history = document.getElementById('chatHistory');
+    const history = getChatMessageStream();
+    const container = getChatContainer();
     const id      = 'bubble-' + Date.now();
     const row     = document.createElement('div');
     row.id = id;
@@ -181,8 +242,7 @@ function appendMessage(text, sender) {
 
     } else if (sender === 'bot') {
         row.className = 'flex gap-3';
-        marked.use(window.markedKatex({ throwOnError: false }));
-        const formatted = marked.parse(text);
+        const formatted = sanitizeRenderedHTML(marked.parse(text || ''));
         row.innerHTML = `
             <div class="w-7 h-7 rounded-full bg-gold/30 flex items-center justify-center text-cardinal shrink-0 mt-0.5" aria-hidden="true">
                 <i class="${bot.iconClass} text-xs"></i>
@@ -211,6 +271,6 @@ function appendMessage(text, sender) {
     }
 
     history.appendChild(row);
-    history.scrollTop = history.scrollHeight;
+    container.scrollTop = container.scrollHeight;
     return id;
 }

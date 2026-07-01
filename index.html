@@ -72,6 +72,9 @@
             padding: 0; margin: -1px; overflow: hidden;
             clip: rect(0,0,0,0); white-space: nowrap; border-width: 0;
         }
+        #chatHistory {
+            scrollbar-gutter: stable;
+        }
     </style>
 </head>
 <body class="bg-stone-50 h-screen flex flex-col overflow-hidden">
@@ -121,31 +124,33 @@
         </div>
     </div>
 
-    <!-- Main: no card, no border — the chat IS the page -->
-    <main class="flex-grow overflow-hidden flex flex-col">
-        <div class="flex-grow max-w-2xl w-full mx-auto flex flex-col overflow-hidden">
+    <!-- Main: edge-to-edge scroll area, centered message stream -->
+    <main class="flex-grow overflow-hidden flex flex-col min-h-0">
+        <div class="flex-grow w-full flex flex-col overflow-hidden min-h-0">
 
-            <!-- Chat history scrolls here; no white card wrapper -->
+            <!-- Scrollbar stays at the screen edge; messages stay centered inside -->
             <div
                 id="chatHistory"
-                class="flex-grow py-6 px-4 overflow-y-auto space-y-5"
+                class="flex-grow min-h-0 overflow-y-auto overflow-x-hidden"
                 aria-live="polite"
                 aria-label="Conversation"
             >
-                <!-- Static welcome message (icon updated on load by JS) -->
-                <div class="flex gap-3">
-                    <div class="w-7 h-7 rounded-full bg-gold/30 flex items-center justify-center text-cardinal shrink-0 mt-0.5">
-                        <i id="welcomeIcon" class="fa-solid fa-robot text-xs" aria-hidden="true"></i>
-                    </div>
-                    <div class="bg-white border border-stone-200 text-stone-800 px-4 py-3 rounded-2xl rounded-tl-sm text-sm leading-relaxed max-w-[85%]">
-                        Fight On! I'm your engineering advisor. Save your API key above, pick an advisor below, and ask me anything about the field.
+                <div id="chatStream" class="max-w-2xl mx-auto w-full px-4 py-6 space-y-5">
+                    <!-- Static welcome message (icon updated on load by JS) -->
+                    <div class="flex gap-3">
+                        <div class="w-7 h-7 rounded-full bg-gold/30 flex items-center justify-center text-cardinal shrink-0 mt-0.5">
+                            <i id="welcomeIcon" class="fa-solid fa-robot text-xs" aria-hidden="true"></i>
+                        </div>
+                        <div class="bg-white border border-stone-200 text-stone-800 px-4 py-3 rounded-2xl rounded-tl-sm text-sm leading-relaxed max-w-[85%]">
+                            Fight On! I'm your engineering advisor. Save your API key above, pick an advisor below, and ask me anything about the field.
+                        </div>
                     </div>
                 </div>
             </div>
 
             <!-- Composer: anchored to the bottom, blends into the page bg -->
             <div class="px-4 pb-4 pt-1 shrink-0">
-                <div class="bg-white border border-stone-200 rounded-2xl shadow-sm focus-within:ring-2 focus-within:ring-cardinal transition">
+                <div class="bg-white border border-stone-200 rounded-2xl shadow-sm focus-within:ring-2 focus-within:ring-cardinal transition max-w-2xl mx-auto">
                     <label for="userInput" class="sr-only">Your message</label>
                     <textarea
                         id="userInput"
@@ -171,6 +176,7 @@
 
                         <!-- Send -->
                         <button
+                            id="sendBtn"
                             onclick="sendMessage()"
                             aria-label="Send message"
                             class="bg-stone-800 hover:bg-stone-900 text-white w-9 h-9 rounded-full text-sm transition duration-150 flex items-center justify-center shrink-0"
