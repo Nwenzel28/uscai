@@ -217,14 +217,26 @@ function registerBubbleForMinimap(row, sender, text) {
 
     const item = document.createElement('button');
     item.type = 'button';
-    item.className = 'h-2 rounded-full w-full bg-white/70 border border-white/30 transition-opacity hover:opacity-100';
-    item.dataset.targetId = row.id;
+    item.className = 'h-2 rounded-full w-full bg-white/70 border border-white/30 transition-all duration-200 hover:scale-105 hover:bg-cardinal/80';
     item.title = sender === 'user' ? 'Your prompt' : sender === 'bot' ? 'AI response' : 'Conversation item';
     item.addEventListener('click', () => scrollToBubble(row.id));
 
     minimapItems.set(row.id, item);
     minimapContainer.appendChild(item);
     if (minimapObserver) minimapObserver.observe(row);
+}
+
+function removeMinimapItem(id) {
+    const row = document.getElementById(id);
+    if (row && minimapObserver) {
+        minimapObserver.unobserve(row);
+    }
+
+    const item = minimapItems.get(id);
+    if (item) {
+        item.remove();
+        minimapItems.delete(id);
+    }
 }
 
 function showToast(message) {
@@ -272,14 +284,6 @@ function createMessageActions(sender, id, text) {
     return actions;
 }
 
-function removeMinimapItem(id) {
-    const item = minimapItems.get(id);
-    if (item) {
-        item.remove();
-        minimapItems.delete(id);
-    }
-}
-
 function handleBubbleAction(event) {
     const button = event.target.closest('[data-action]');
     if (!button) return;
@@ -290,14 +294,18 @@ function handleBubbleAction(event) {
 
     if (action === 'edit') {
         const text = row.dataset.text;
+        const botIndex = Number(row.dataset.botIndex);
         const input = document.getElementById('userInput');
+        if (typeof botIndex === 'number' && !Number.isNaN(botIndex)) {
+            currentBotIndex = botIndex;
+            document.getElementById('botSelector').value = String(botIndex);
+            updateBotUI();
+        }
         if (input) {
             input.value = text;
             autoResizeInput();
             input.focus();
         }
-        row.remove();
-        removeMinimapItem(row.id);
         return;
     }
 
@@ -312,7 +320,13 @@ function handleBubbleAction(event) {
 
     if (action === 'redo') {
         const userText = row.dataset.userText || row.dataset.replyText || '';
+        const botIndex = Number(row.dataset.botIndex);
         if (!userText) return;
+        if (typeof botIndex === 'number' && !Number.isNaN(botIndex)) {
+            currentBotIndex = botIndex;
+            document.getElementById('botSelector').value = String(botIndex);
+            updateBotUI();
+        }
         const input = document.getElementById('userInput');
         if (!input) return;
         input.value = userText;
@@ -342,7 +356,7 @@ async function sendMessage() {
     setComposerBusy(true);
     lastUserText = userText;
 
-    appendMessage(userText, 'user');
+    appendMessage(userText, 'user', { botIndex: currentBotIndex });
     input.value = '';
     autoResizeInput();
 
@@ -368,7 +382,10 @@ async function sendMessage() {
 
         if (res.ok) {
             const reply = data && data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0] && data.candidates[0].content.parts[0].text;
-            appendMessage(reply || 'Sorry — I could not generate a response this time.', 'bot');
+            appendMessage(reply || 'Sorry — I could not generate a response this time.', 'bot', {
+                userText,
+                botIndex: currentBotIndex
+            });
         } else {
             const errorMessage = data && data.error && data.error.message ? data.error.message : 'Unknown error';
             appendMessage('Error: ' + errorMessage, 'error');
@@ -385,7 +402,7 @@ async function sendMessage() {
 }
 
 // Render a message bubble and scroll the chat into view
-function appendMessage(text, sender) {
+function appendMessage(text, sender, metadata = {}) {
     const history = getChatMessageStream();
     const container = getChatContainer();
     const id = 'bubble-' + Date.now();
@@ -394,10 +411,10 @@ function appendMessage(text, sender) {
     row.dataset.messageId = id;
     row.classList.add('group', 'message-enter');
 
-    const bubbleWrapper = document.createElement('div');
-    bubbleWrapper.className = 'relative max-w-[85%]';
-
     const bot = BOT_CONFIG[currentBotIndex];
+    const wrapperClasses = sender === 'bot' ? 'relative flex-1 min-w-0' : 'relative max-w-[85%]';
+    const bubbleWrapper = document.createElement('div');
+    bubbleWrapper.className = wrapperClasses;
 
     if (sender === 'user') {
         row.classList.add('flex', 'justify-end');
@@ -407,6 +424,7 @@ function appendMessage(text, sender) {
         bubbleWrapper.appendChild(bubble);
         bubbleWrapper.appendChild(createMessageActions('user', id, text));
         row.dataset.text = text;
+        row.dataset.botIndex = metadata.botIndex != null ? String(metadata.botIndex) : String(currentBotIndex);
         row.appendChild(bubbleWrapper);
 
     } else if (sender === 'bot') {
@@ -417,11 +435,12 @@ function appendMessage(text, sender) {
         icon.innerHTML = `<i class="${bot.iconClass} text-xs"></i>`;
 
         const bubble = document.createElement('div');
-        bubble.className = 'bg-white border border-stone-200 text-stone-800 px-4 py-3 rounded-2xl rounded-tl-sm text-sm leading-relaxed max-w-[85%]';
+        bubble.className = 'bg-white border border-stone-200 text-stone-800 px-4 py-3 rounded-2xl rounded-tl-sm text-sm leading-relaxed min-w-0';
         bubble.innerHTML = `<div class="prose prose-sm prose-stone max-w-none">${sanitizeRenderedHTML(marked.parse(text || ''))}</div>`;
         bubbleWrapper.appendChild(bubble);
         bubbleWrapper.appendChild(createMessageActions('bot', id, text));
-        row.dataset.userText = lastUserText;
+        row.dataset.userText = metadata.userText || lastUserText;
+        row.dataset.botIndex = metadata.botIndex != null ? String(metadata.botIndex) : String(currentBotIndex);
         row.appendChild(icon);
         row.appendChild(bubbleWrapper);
 
