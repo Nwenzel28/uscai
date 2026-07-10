@@ -75,6 +75,21 @@
         #chatHistory {
             scrollbar-gutter: stable;
         }
+        .message-enter {
+            opacity: 0;
+            transform: translateY(10px);
+            transition: opacity 180ms ease-out, transform 180ms ease-out;
+        }
+        .message-enter-user {
+            transform: translate(12px, 10px);
+        }
+        .message-enter-bot {
+            transform: translate(-12px, 10px);
+        }
+        .message-enter-active {
+            opacity: 1;
+            transform: translate(0, 0);
+        }
     </style>
 </head>
 <body class="bg-stone-50 h-screen flex flex-col overflow-hidden">

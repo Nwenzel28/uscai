@@ -206,10 +206,11 @@ async function sendMessage() {
         if (loadingEl) loadingEl.remove();
 
         if (res.ok) {
-            const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+            const reply = data && data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0] && data.candidates[0].content.parts[0].text;
             appendMessage(reply || 'Sorry — I could not generate a response this time.', 'bot');
         } else {
-            appendMessage('Error: ' + (data.error?.message ?? 'Unknown error'), 'error');
+            const errorMessage = data && data.error && data.error.message ? data.error.message : 'Unknown error';
+            appendMessage('Error: ' + errorMessage, 'error');
         }
     } catch (err) {
         const loadingEl = document.getElementById(loadingId);
@@ -233,7 +234,7 @@ function appendMessage(text, sender) {
     const bot = BOT_CONFIG[currentBotIndex];
 
     if (sender === 'user') {
-        row.className = 'flex justify-end';
+        row.className = 'flex justify-end message-enter message-enter-user';
         const bubble = document.createElement('div');
         // Dark stone bubble for the user — cardinal is reserved for the header/brand.
         bubble.className = 'bg-stone-800 text-white px-4 py-3 rounded-2xl rounded-tr-sm text-sm leading-relaxed whitespace-pre-wrap max-w-[85%]';
@@ -241,7 +242,7 @@ function appendMessage(text, sender) {
         row.appendChild(bubble);
 
     } else if (sender === 'bot') {
-        row.className = 'flex gap-3';
+        row.className = 'flex gap-3 message-enter message-enter-bot';
         const formatted = sanitizeRenderedHTML(marked.parse(text || ''));
         row.innerHTML = `
             <div class="w-7 h-7 rounded-full bg-gold/30 flex items-center justify-center text-cardinal shrink-0 mt-0.5" aria-hidden="true">
@@ -271,6 +272,7 @@ function appendMessage(text, sender) {
     }
 
     history.appendChild(row);
+    requestAnimationFrame(() => row.classList.add('message-enter-active'));
     container.scrollTop = container.scrollHeight;
     return id;
 }
