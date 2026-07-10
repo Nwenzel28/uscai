@@ -74,47 +74,13 @@
         }
         #chatHistory {
             scrollbar-gutter: stable;
-            position: relative;
-        }
-        .message-enter {
-            opacity: 0;
-            transform: translateY(10px);
-        }
-        .message-enter-active {
-            animation: message-enter 220ms ease-out forwards;
-        }
-        @keyframes message-enter {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .message-actions {
-            opacity: 0;
-            pointer-events: none;
-        }
-        .group:hover .message-actions,
-        .message-actions-visible {
-            opacity: 1;
-            pointer-events: auto;
-        }
-        .toast {
-            position: fixed;
-            bottom: 1.5rem;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(15, 23, 42, 0.95);
-            color: #f8fafc;
-            padding: 0.75rem 1rem;
-            border-radius: 9999px;
-            box-shadow: 0 18px 48px rgba(15, 23, 42, 0.22);
-            font-size: 0.9rem;
-            z-index: 50;
         }
     </style>
 </head>
 <body class="bg-stone-50 h-screen flex flex-col overflow-hidden">
 
-    <!-- Header: glassmorphism styling for depth and translucency -->
-    <header class="sticky top-0 z-30 bg-cardinal/90 backdrop-blur-md border-b border-white/20 text-white py-3 px-6 flex items-center justify-between shrink-0 shadow-sm">
+    <!-- Header: thin, brand present but not heavy -->
+    <header class="bg-cardinal text-white py-3 px-6 flex items-center justify-between shrink-0">
         <div class="flex items-center gap-3">
             <i class="fa-solid fa-graduation-cap text-xl text-gold" aria-hidden="true"></i>
             <div class="flex items-baseline gap-2">
@@ -169,10 +135,6 @@
                 aria-live="polite"
                 aria-label="Conversation"
             >
-                <div id="conversationMinimap" class="hidden xl:flex absolute top-4 right-4 z-20 h-[calc(100%-2rem)] w-14 flex-col gap-2 rounded-3xl border border-white/30 bg-white/70 p-2 shadow-lg backdrop-blur-md">
-                    <div class="text-[10px] font-semibold uppercase tracking-[0.2em] text-stone-500 text-center">Session</div>
-                    <div id="minimapItems" class="flex flex-col gap-2 flex-1 overflow-hidden"></div>
-                </div>
                 <div id="chatStream" class="max-w-2xl mx-auto w-full px-4 py-6 space-y-5">
                     <!-- Static welcome message (icon updated on load by JS) -->
                     <div class="flex gap-3">
