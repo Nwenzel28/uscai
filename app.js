@@ -248,8 +248,9 @@ function showToast(message) {
 }
 
 function createMessageActions(sender, id, text) {
+    const position = sender === 'user' ? 'right-2 bottom-2' : 'left-2 bottom-2';
     const actions = document.createElement('div');
-    actions.className = 'message-actions absolute right-1 top-1 flex gap-1 rounded-full bg-white/90 px-1.5 py-1 shadow-sm transition-opacity backdrop-blur-sm ring-1 ring-stone-200 opacity-0 pointer-events-none';
+    actions.className = `message-actions absolute ${position} flex gap-1 rounded-full bg-white/90 px-1.5 py-1 shadow-sm transition-opacity backdrop-blur-sm ring-1 ring-stone-200 opacity-0 pointer-events-none`;
     actions.dataset.messageId = id;
 
     if (sender === 'user') {
@@ -412,7 +413,7 @@ function appendMessage(text, sender, metadata = {}) {
     row.classList.add('group', 'message-enter');
 
     const bot = BOT_CONFIG[currentBotIndex];
-    const wrapperClasses = sender === 'bot' ? 'relative flex-1 min-w-0' : 'relative max-w-[85%]';
+    const wrapperClasses = 'relative max-w-[85%]';
     const bubbleWrapper = document.createElement('div');
     bubbleWrapper.className = wrapperClasses;
 
