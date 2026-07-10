@@ -394,6 +394,11 @@ function appendMessage(text, sender) {
     row.dataset.messageId = id;
     row.classList.add('group', 'message-enter');
 
+<<<<<<< HEAD
+=======
+    const bot = BOT_CONFIG[currentBotIndex];
+    const wrapperClasses = sender === 'bot' ? 'relative flex-1 min-w-0' : 'relative max-w-[85%]';
+>>>>>>> parent of 736767a (Improve right-side conversation minimap and message action positioning for cleaner UI/UX)
     const bubbleWrapper = document.createElement('div');
     bubbleWrapper.className = 'relative max-w-[85%]';
 
