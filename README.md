@@ -15,6 +15,9 @@ The application is split into three main files located in the same directory:
 ├── config.js      # The Weekly Persona Configuration (Customizable settings)
 └── app.js         # The Application Logic (API integrations & UI manipulation)
 ```
+
+For a quick setup walkthrough, see `SETUP.md`.
+
 1. Presentation Layer (index.html)
 Handles the visual structure, layout, and responsive design using Tailwind CSS utility classes. Mirrors USC's official branding with cardinal (#990000) and gold (#FFCC00) accents. It acts as a passive layout shell that imports the behavioral scripts at the bottom of the document.
 
@@ -45,14 +48,15 @@ Click Save Key Locally.
 ## ✍️ Weekly Maintenance Guide
 When transitioning to a new engineering discipline each week, your team only needs to modify the parameters in config.js.
 
-Open config.js in a text editor and modify the configuration object:
+Open config.js in a text editor and modify the configuration array of bot definitions:
 ```JavaScript
-const BOT_CONFIG = {
+const BOT_CONFIG = [
+  {
     title: "CivicBot (Civil & Env.)",        // Change to your new bot name
     iconClass: "fa-solid fa-helmet-safety",   // Swap FontAwesome icon classes here
-
     systemPrompt: `You are CivicBot, an enthusiastic expert...` // Update persona/rules here
-};
+  }
+];
 ```
 Tips for Effective System Prompts:
 Role/Persona: Explicitly state who the AI is mimicking (e.g., "You are AeroBot, a passionate Aerospace Engineer at USC...").
