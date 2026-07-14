@@ -5,6 +5,7 @@
 let currentBotIndex = 0;
 let isSending = false;
 let conversationHistory = []; // Gemini-format turns: {role:'user'|'model', parts:[{text}]}. Resets on bot switch / clear.
+let bubbleCounter = 0; // guarantees unique bubble ids even when two bubbles are appended in the same millisecond
 
 // Matches max-h-[140px] on #userInput
 const COMPOSER_MAX_HEIGHT = 140;
@@ -253,7 +254,7 @@ async function sendMessage() {
 function appendMessage(text, sender) {
     const history = getChatMessageStream();
     const container = getChatContainer();
-    const id      = 'bubble-' + Date.now();
+    const id      = 'bubble-' + (bubbleCounter++);
     const row     = document.createElement('div');
     row.id = id;
 
