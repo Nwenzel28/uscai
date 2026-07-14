@@ -103,14 +103,25 @@
                 <span class="text-xs text-gold/90 font-semibold tracking-wider hidden sm:inline">DISCOVER ENGINEERING</span>
             </div>
         </div>
-        <button
-            id="settingsBtn"
-            onclick="toggleSettings()"
-            aria-label="API key settings"
-            class="w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center transition"
-        >
-            <i id="settingsIcon" class="fa-solid fa-key text-sm text-gold/90"></i>
-        </button>
+        <div class="flex items-center gap-1">
+            <button
+                id="clearChatBtn"
+                onclick="clearChat()"
+                aria-label="Clear chat"
+                title="Clear chat"
+                class="w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center transition"
+            >
+                <i class="fa-solid fa-broom text-sm text-gold/90"></i>
+            </button>
+            <button
+                id="settingsBtn"
+                onclick="toggleSettings()"
+                aria-label="API key settings"
+                class="w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center transition"
+            >
+                <i id="settingsIcon" class="fa-solid fa-key text-sm text-gold/90"></i>
+            </button>
+        </div>
     </header>
 
     <!-- Credentials panel: compact bar, not a separate card competing with the chat -->

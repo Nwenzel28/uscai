@@ -4,6 +4,7 @@
 
 let currentBotIndex = 0;
 let isSending = false;
+let conversationHistory = []; // Gemini-format turns: {role:'user'|'model', parts:[{text}]}. Resets on bot switch / clear.
 
 // Matches max-h-[140px] on #userInput
 const COMPOSER_MAX_HEIGHT = 140;
@@ -105,11 +106,25 @@ function updateBotUI() {
 // Switch advisors
 function switchBot() {
     currentBotIndex = Number.parseInt(document.getElementById('botSelector').value, 10) || 0;
+    conversationHistory = []; // new advisor, new context
     updateBotUI();
     appendMessage(
         `Fight On! I'm ${BOT_CONFIG[currentBotIndex].title}. How can I help you today?`,
         'bot'
     );
+}
+
+// Wipe the on-screen transcript and the memory sent to the API, then greet again
+function clearChat() {
+    if (!confirm('Clear this conversation? This cannot be undone.')) return;
+
+    conversationHistory = [];
+    getChatMessageStream().innerHTML = '';
+    appendMessage(
+        `Fight On! I'm ${BOT_CONFIG[currentBotIndex].title}. How can I help you today?`,
+        'bot'
+    );
+    document.getElementById('userInput').focus();
 }
 
 // Toggle the settings/credentials bar
@@ -185,6 +200,9 @@ async function sendMessage() {
     input.value = '';
     autoResizeInput();
 
+    // Add the new turn to memory *before* the call so the model sees it as part of the thread
+    conversationHistory.push({ role: 'user', parts: [{ text: userText }] });
+
     const loadingId = appendMessage('Thinking…', 'loading');
 
     try {
@@ -194,9 +212,9 @@ async function sendMessage() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    contents: [{ role: 'user', parts: [{ text: userText }] }],
+                    contents: conversationHistory,
                     systemInstruction: { parts: [{ text: BOT_CONFIG[currentBotIndex].systemPrompt }] },
-                    generationConfig: { maxOutputTokens: 500, temperature: 0.7 }
+                    generationConfig: { maxOutputTokens: 800, temperature: 0.7 }
                 })
             }
         );
@@ -207,12 +225,20 @@ async function sendMessage() {
 
         if (res.ok) {
             const reply = data && data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0] && data.candidates[0].content.parts[0].text;
-            appendMessage(reply || 'Sorry — I could not generate a response this time.', 'bot');
+            if (reply) {
+                conversationHistory.push({ role: 'model', parts: [{ text: reply }] });
+                appendMessage(reply, 'bot');
+            } else {
+                conversationHistory.pop(); // no reply came back — don't leave a dangling user turn in memory
+                appendMessage('Sorry — I could not generate a response this time.', 'bot');
+            }
         } else {
+            conversationHistory.pop(); // call failed — don't poison future turns with an unanswered message
             const errorMessage = data && data.error && data.error.message ? data.error.message : 'Unknown error';
             appendMessage('Error: ' + errorMessage, 'error');
         }
     } catch (err) {
+        conversationHistory.pop();
         const loadingEl = document.getElementById(loadingId);
         if (loadingEl) loadingEl.remove();
         appendMessage('Connection error: ' + err.message, 'error');
