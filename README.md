@@ -16,7 +16,7 @@ The application is split into three main files located in the same directory:
 └── app.js         # The Application Logic (API integrations & UI manipulation)
 ```
 1. Presentation Layer (index.html)
-Handles the visual structure, layout, and responsive design using Tailwind CSS utility classes. Mirrors USC's official branding with cardinal (#990000) and gold (#FFC72C) accents. It acts as a passive layout shell that imports the behavioral scripts at the bottom of the document.
+Handles the visual structure, layout, and responsive design using Tailwind CSS utility classes. Mirrors USC's official branding with cardinal (#990000) and gold (#FFCC00) accents. It acts as a passive layout shell that imports the behavioral scripts at the bottom of the document.
 
 2. Configuration Layer (config.js)
 Contains the BOT_CONFIG global object. This is the only file that needs to be edited to change the behaviour of the Bots. It dictates the bot's display name, FontAwesome icon, and its specific behavioral prompt boundaries.
