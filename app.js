@@ -595,29 +595,50 @@ async function requestBotReply(apiKey) {
 
         while (true) {
             const { done, value } = await reader.read();
-            if (done) break;
+            if (value) {
+                buffer += decoder.decode(value, { stream: true });
+            }
 
-            buffer += decoder.decode(value, { stream: true });
-            const events = buffer.split('\n\n');
-            buffer = events.pop(); // last chunk may be incomplete — keep it for the next read
+            let lineBreakIndex;
+            // Robust line-by-line parsing
+            while ((lineBreakIndex = buffer.indexOf('\n')) !== -1) {
+                const line = buffer.slice(0, lineBreakIndex).trim();
+                buffer = buffer.slice(lineBreakIndex + 1);
 
-            for (const evt of events) {
-                const line = evt.split('\n').find((l) => l.startsWith('data:'));
-                if (!line) continue;
-                const jsonStr = line.slice(5).trim();
-                if (!jsonStr) continue;
+                if (line.startsWith('data:')) {
+                    const jsonStr = line.slice(5).trim();
+                    try {
+                        const parsed = JSON.parse(jsonStr);
+                        const piece = parsed && parsed.candidates && parsed.candidates[0]
+                            && parsed.candidates[0].content && parsed.candidates[0].content.parts
+                            && parsed.candidates[0].content.parts[0] && parsed.candidates[0].content.parts[0].text;
+                        if (piece) {
+                            fullText += piece;
+                            sawAnyText = true;
+                            updateBotStream(stream, fullText);
+                        }
+                    } catch (_) { /* ignore partial/malformed SSE frames */ }
+                }
+            }
 
-                try {
-                    const parsed = JSON.parse(jsonStr);
-                    const piece = parsed && parsed.candidates && parsed.candidates[0]
-                        && parsed.candidates[0].content && parsed.candidates[0].content.parts
-                        && parsed.candidates[0].content.parts[0] && parsed.candidates[0].content.parts[0].text;
-                    if (piece) {
-                        fullText += piece;
-                        sawAnyText = true;
-                        updateBotStream(stream, fullText);
-                    }
-                } catch (_) { /* ignore partial/malformed SSE frames */ }
+            if (done) {
+                // Flush and process any leftover content in the buffer that didn't end with a newline
+                const remainingLine = buffer.trim();
+                if (remainingLine.startsWith('data:')) {
+                    const jsonStr = remainingLine.slice(5).trim();
+                    try {
+                        const parsed = JSON.parse(jsonStr);
+                        const piece = parsed && parsed.candidates && parsed.candidates[0]
+                            && parsed.candidates[0].content && parsed.candidates[0].content.parts
+                            && parsed.candidates[0].content.parts[0] && parsed.candidates[0].content.parts[0].text;
+                        if (piece) {
+                            fullText += piece;
+                            sawAnyText = true;
+                            updateBotStream(stream, fullText);
+                        }
+                    } catch (_) { /* ignore partial/malformed SSE frames */ }
+                }
+                break;
             }
         }
 
