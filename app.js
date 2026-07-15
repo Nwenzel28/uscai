@@ -6,9 +6,11 @@ let currentBotIndex = 0;
 let isSending = false;
 let conversationHistory = []; // Gemini-format turns: {role:'user'|'model', parts:[{text}]}. Resets on bot switch / clear.
 let bubbleCounter = 0; // guarantees unique bubble ids even when two bubbles are appended in the same millisecond
+let confirmAction = null; // callback wired up by showConfirm(), run by the modal's action button
 
 // Matches max-h-[140px] on #userInput
 const COMPOSER_MAX_HEIGHT = 140;
+const IS_MAC = /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent || '');
 
 function getChatContainer() {
     return document.getElementById('chatHistory');
@@ -54,114 +56,276 @@ function sanitizeRenderedHTML(html) {
     return root.innerHTML;
 }
 
+// Small helper: show/hide a "pop" panel with the enter transition, keeping only one open at a time
+function openPanel(el) {
+    el.classList.remove('hidden');
+    requestAnimationFrame(() => el.classList.add('pop-enter-active'));
+}
+function closePanel(el) {
+    el.classList.remove('pop-enter-active');
+    setTimeout(() => el.classList.add('hidden'), 120);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
-    populateDropdown();
+    populateBotPicker();
     updateBotUI();
+    refreshKeyState();
 
     if (window.marked && window.markedKatex) {
         marked.use(window.markedKatex({ throwOnError: false }));
     }
 
-    const hasKey = !!localStorage.getItem('gemini_api_key');
-    const panel  = document.getElementById('settingsPanel');
-    const clear  = document.getElementById('clearKeyBtn');
-    const icon   = document.getElementById('settingsIcon');
-
-    if (hasKey) {
-        panel.classList.add('hidden');
-        clear.classList.remove('hidden');
-        icon.className = 'fa-solid fa-key text-sm text-white/40';
-    } else {
-        // No key yet — keep panel visible so the user knows to set one
-        panel.classList.remove('hidden');
-        clear.classList.add('hidden');
-        icon.className = 'fa-solid fa-key text-sm text-gold/90';
-    }
-
     setSendButtonState(false);
+
+    // Close open panels on outside click
+    document.addEventListener('click', (e) => {
+        const botWrap = document.getElementById('botPickerWrap');
+        const botMenu = document.getElementById('botPickerMenu');
+        if (!botMenu.classList.contains('hidden') && !botWrap.contains(e.target)) {
+            closeBotPicker();
+        }
+
+        const keyPopup = document.getElementById('keyPopup');
+        const settingsBtn = document.getElementById('settingsBtn');
+        if (!keyPopup.classList.contains('hidden') && !keyPopup.contains(e.target) && e.target !== settingsBtn && !settingsBtn.contains(e.target)) {
+            closeKeyPopup();
+        }
+    });
+
+    // Escape closes whatever's open, most-specific first
+    document.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape') return;
+        if (!document.getElementById('confirmOverlay').classList.contains('hidden')) { hideConfirm(); return; }
+        if (!document.getElementById('keyPopup').classList.contains('hidden')) { closeKeyPopup(); return; }
+        if (!document.getElementById('botPickerMenu').classList.contains('hidden')) { closeBotPicker(); return; }
+    });
+
+    // Capture pastes into the invisible key field directly
+    const input = document.getElementById('apiKeyInput');
+    input.addEventListener('paste', (e) => {
+        const pasted = (e.clipboardData || window.clipboardData).getData('text').trim();
+        e.preventDefault();
+        if (!pasted) return;
+
+        localStorage.setItem('gemini_api_key', pasted);
+        input.value = '';
+
+        // brief confirmation flash on both glyphs before the popup closes itself
+        setKeySymbolActive(document.getElementById('cmdKeySymbol'), true);
+        setKeySymbolActive(document.getElementById('vKeySymbol'), true);
+        refreshKeyState();
+        setTimeout(closeKeyPopup, 220);
+    });
 });
 
-// Build the advisor dropdown from config.js
-function populateDropdown() {
-    const sel = document.getElementById('botSelector');
-    sel.innerHTML = '';
+// ---------------------------------------------------------------------------
+// Bot picker (custom dropdown)
+// ---------------------------------------------------------------------------
+
+function populateBotPicker() {
+    const menu = document.getElementById('botPickerMenu');
+    menu.innerHTML = '';
     BOT_CONFIG.forEach((bot, i) => {
-        const opt = document.createElement('option');
-        opt.value = i;
-        opt.textContent = bot.title;
-        sel.appendChild(opt);
+        const opt = document.createElement('button');
+        opt.type = 'button';
+        opt.setAttribute('role', 'option');
+        opt.setAttribute('aria-selected', String(i === currentBotIndex));
+        opt.className = 'w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left hover:bg-stone-50 transition';
+        opt.onclick = () => selectBot(i);
+
+        opt.innerHTML = `
+            <i class="${bot.iconClass} text-cardinal text-xs w-4 text-center shrink-0" aria-hidden="true"></i>
+            <span class="flex-grow text-stone-700 truncate">${bot.title}</span>
+            <i class="fa-solid fa-check text-cardinal text-xs shrink-0 ${i === currentBotIndex ? '' : 'invisible'}" aria-hidden="true"></i>`;
+        menu.appendChild(opt);
     });
 }
 
-// Sync icon + placeholder to whichever advisor is active
-function updateBotUI() {
-    const bot = BOT_CONFIG[currentBotIndex];
-    document.getElementById('botSelectorIcon').className =
-        bot.iconClass + ' absolute left-2.5 top-1/2 -translate-y-1/2 text-cardinal text-xs pointer-events-none';
-    document.getElementById('welcomeIcon').className =
-        bot.iconClass + ' text-xs';
-    document.getElementById('userInput').placeholder =
-        `Ask ${bot.title} a question…`;
+function toggleBotPicker() {
+    const menu = document.getElementById('botPickerMenu');
+    if (menu.classList.contains('hidden')) {
+        closeKeyPopup();
+        openBotPicker();
+    } else {
+        closeBotPicker();
+    }
 }
 
-// Switch advisors
-function switchBot() {
-    currentBotIndex = Number.parseInt(document.getElementById('botSelector').value, 10) || 0;
+function openBotPicker() {
+    const menu = document.getElementById('botPickerMenu');
+    const btn  = document.getElementById('botPickerBtn');
+    openPanel(menu);
+    btn.setAttribute('aria-expanded', 'true');
+    document.getElementById('botPickerChevron').classList.add('rotate-180');
+}
+
+function closeBotPicker() {
+    const menu = document.getElementById('botPickerMenu');
+    const btn  = document.getElementById('botPickerBtn');
+    closePanel(menu);
+    btn.setAttribute('aria-expanded', 'false');
+    document.getElementById('botPickerChevron').classList.remove('rotate-180');
+}
+
+function selectBot(i) {
+    currentBotIndex = i;
     conversationHistory = []; // new advisor, new context
     updateBotUI();
+    populateBotPicker(); // refresh checkmarks
+    closeBotPicker();
     appendMessage(
         `Fight On! I'm ${BOT_CONFIG[currentBotIndex].title}. How can I help you today?`,
         'bot'
     );
 }
 
-// Wipe the on-screen transcript and the memory sent to the API, then greet again
+// Sync icon + label + placeholder to whichever advisor is active
+function updateBotUI() {
+    const bot = BOT_CONFIG[currentBotIndex];
+    document.getElementById('botSelectorIcon').className = bot.iconClass + ' text-cardinal text-xs shrink-0';
+    document.getElementById('botPickerLabel').textContent = bot.title;
+    document.getElementById('welcomeIcon').className = bot.iconClass + ' text-xs';
+    document.getElementById('userInput').placeholder = `Ask ${bot.title} a question…`;
+}
+
+// ---------------------------------------------------------------------------
+// API key popup (press Cmd/Ctrl + V to paste — no visible text field)
+// ---------------------------------------------------------------------------
+
+function refreshKeyState() {
+    const hasKey = !!localStorage.getItem('gemini_api_key');
+    const clearBtn = document.getElementById('clearKeyBtn');
+    const icon = document.getElementById('settingsIcon');
+    clearBtn.classList.toggle('hidden', !hasKey);
+    icon.className = hasKey ? 'fa-solid fa-key text-sm text-white/40' : 'fa-solid fa-key text-sm text-gold/90';
+}
+
+function toggleKeyPopup() {
+    const popup = document.getElementById('keyPopup');
+    if (popup.classList.contains('hidden')) {
+        closeBotPicker();
+        openKeyPopup();
+    } else {
+        closeKeyPopup();
+    }
+}
+
+function openKeyPopup() {
+    const popup = document.getElementById('keyPopup');
+    const input = document.getElementById('apiKeyInput');
+    document.getElementById('keyHint').textContent = (IS_MAC ? 'Cmd' : 'Ctrl') + ' + V to paste';
+    document.getElementById('cmdKeySymbol').textContent = IS_MAC ? '⌘' : 'Ctrl';
+
+    openPanel(popup);
+    document.getElementById('settingsBtn').setAttribute('aria-expanded', 'true');
+
+    input.value = '';
+    setTimeout(() => input.focus(), 60);
+
+    window.addEventListener('keydown', handleKeySymbolDown);
+    window.addEventListener('keyup', handleKeySymbolUp);
+}
+
+function closeKeyPopup() {
+    const popup = document.getElementById('keyPopup');
+    closePanel(popup);
+    document.getElementById('settingsBtn').setAttribute('aria-expanded', 'false');
+    resetKeySymbols();
+    window.removeEventListener('keydown', handleKeySymbolDown);
+    window.removeEventListener('keyup', handleKeySymbolUp);
+}
+
+// Toggle a glyph's active state. Color is swapped via Tailwind's own class
+// (rather than a custom CSS class) so it isn't at the mercy of stylesheet
+// injection order — Tailwind's CDN build injects its rules after our inline
+// <style> block, so a same-specificity custom class was silently losing.
+function setKeySymbolActive(el, active) {
+    el.classList.toggle('key-symbol-active', active); // scale only
+    el.classList.toggle('text-gold', active);
+    el.classList.toggle('text-stone-300', !active);
+}
+
+function resetKeySymbols() {
+    setKeySymbolActive(document.getElementById('cmdKeySymbol'), false);
+    setKeySymbolActive(document.getElementById('vKeySymbol'), false);
+}
+
+// Light up the Cmd/Ctrl and V glyphs while they're actually held down
+function handleKeySymbolDown(e) {
+    if (e.key === 'Meta' || e.key === 'Control') {
+        setKeySymbolActive(document.getElementById('cmdKeySymbol'), true);
+    }
+    if (e.key && e.key.toLowerCase() === 'v') {
+        setKeySymbolActive(document.getElementById('vKeySymbol'), true);
+    }
+}
+function handleKeySymbolUp(e) {
+    if (e.key === 'Meta' || e.key === 'Control') {
+        setKeySymbolActive(document.getElementById('cmdKeySymbol'), false);
+    }
+    if (e.key && e.key.toLowerCase() === 'v') {
+        setKeySymbolActive(document.getElementById('vKeySymbol'), false);
+    }
+}
+
+function requestClearKey() {
+    showConfirm(
+        "Remove the saved API key from this browser? You'll need to paste it again to keep chatting.",
+        'Remove key',
+        () => {
+            localStorage.removeItem('gemini_api_key');
+            refreshKeyState();
+        }
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Chat clearing
+// ---------------------------------------------------------------------------
+
 function clearChat() {
-    if (!confirm('Clear this conversation? This cannot be undone.')) return;
-
-    conversationHistory = [];
-    getChatMessageStream().innerHTML = '';
-    appendMessage(
-        `Fight On! I'm ${BOT_CONFIG[currentBotIndex].title}. How can I help you today?`,
-        'bot'
-    );
-    document.getElementById('userInput').focus();
+    showConfirm('Clear this conversation? This cannot be undone.', 'Clear chat', () => {
+        conversationHistory = [];
+        getChatMessageStream().innerHTML = '';
+        appendMessage(
+            `Fight On! I'm ${BOT_CONFIG[currentBotIndex].title}. How can I help you today?`,
+            'bot'
+        );
+        document.getElementById('userInput').focus();
+    });
 }
 
-// Toggle the settings/credentials bar
-function toggleSettings() {
-    const panel = document.getElementById('settingsPanel');
-    const isHidden = panel.classList.toggle('hidden');
-    if (!isHidden) {
-        setTimeout(() => document.getElementById('apiKeyInput').focus(), 50);
-    }
+// ---------------------------------------------------------------------------
+// Integrated confirm modal (replaces native window.confirm())
+// ---------------------------------------------------------------------------
+
+function showConfirm(message, actionLabel, onConfirm) {
+    document.getElementById('confirmMessage').textContent = message;
+    document.getElementById('confirmActionBtn').textContent = actionLabel || 'Confirm';
+    confirmAction = onConfirm;
+
+    const card = document.getElementById('confirmCard');
+    document.getElementById('confirmOverlay').classList.remove('hidden');
+    requestAnimationFrame(() => card.classList.add('pop-enter-active'));
 }
 
-// Save key to localStorage and close the panel
-function saveKey() {
-    const key = document.getElementById('apiKeyInput').value.trim();
-    if (!key) {
-        alert('Please paste a valid API key first.');
-        return;
-    }
-    localStorage.setItem('gemini_api_key', key);
-    document.getElementById('apiKeyInput').value = '';
-    document.getElementById('settingsPanel').classList.add('hidden');
-    document.getElementById('clearKeyBtn').classList.remove('hidden');
-    document.getElementById('settingsIcon').className =
-        'fa-solid fa-key text-sm text-white/40';
+function hideConfirm() {
+    const overlay = document.getElementById('confirmOverlay');
+    const card = document.getElementById('confirmCard');
+    card.classList.remove('pop-enter-active');
+    setTimeout(() => overlay.classList.add('hidden'), 120);
+    confirmAction = null;
 }
 
-// Remove the key and reopen the panel — important on shared/lab computers
-function clearKey() {
-    if (!confirm("Remove the saved API key from this browser? You'll need to paste it again to keep chatting.")) return;
-    localStorage.removeItem('gemini_api_key');
-    document.getElementById('clearKeyBtn').classList.add('hidden');
-    document.getElementById('settingsPanel').classList.remove('hidden');
-    document.getElementById('settingsIcon').className =
-        'fa-solid fa-key text-sm text-gold/90';
-    setTimeout(() => document.getElementById('apiKeyInput').focus(), 50);
+function runConfirmedAction() {
+    const action = confirmAction;
+    hideConfirm();
+    if (action) action();
 }
+
+// ---------------------------------------------------------------------------
+// Composer
+// ---------------------------------------------------------------------------
 
 // Grow the textarea as the user types; collapse on send
 function autoResizeInput() {
@@ -185,8 +349,7 @@ async function sendMessage() {
     const apiKey = localStorage.getItem('gemini_api_key');
     if (!apiKey) {
         // Nudge the user to set the key rather than throwing a bare alert
-        document.getElementById('settingsPanel').classList.remove('hidden');
-        document.getElementById('apiKeyInput').focus();
+        openKeyPopup();
         return;
     }
 

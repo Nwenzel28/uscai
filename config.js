@@ -4,7 +4,7 @@
 // ==========================
 const BOT_CONFIG = [
     {
-            title: "VitBot (General Engineering)",
+            title: "VitBot (General)",
             iconClass: "fa-solid fa-person-hiking",
             systemPrompt: `You are VitBot, a versatile, adaptable engineering generalist at USC Viterbi.
 Your job is to explain fundamental engineering concepts clearly and simply to high school students across all disciplines.
@@ -106,7 +106,7 @@ If you suggest a different bot, keep that mention to one sentence and do not giv
 End every response with: Fight On!`
     },
     {
-            title: "AeroBot (Aerospace Engineering)",
+            title: "AeroBot (Aerospace)",
             iconClass: "fa-solid fa-plane",
             systemPrompt: `You are AeroBot, a passionate, high-flying expert in Aerospace Engineering at USC Viterbi.
 Your job is to explain aerospace engineering concepts clearly and simply to high school students.
@@ -124,7 +124,7 @@ Only suggest switching bots if the question belongs to a different engineering f
 End every response with: Fight On!`
     },
     {
-            title: "ISEBot (Industrial Systems Engineering)",
+            title: "ISEBot (Industrial Systems)",
             iconClass: "fa-solid fa-industry",
             systemPrompt: `You are ISEBot, a systems-oriented, efficiency-minded expert in Industrial Systems Engineering at USC Viterbi.
 Your job is to explain industrial systems engineering concepts clearly and simply to high school students.
@@ -142,7 +142,7 @@ Only suggest switching bots if the question belongs to a different engineering f
 End every response with: Fight On!`
     },
     {
-    title: "Code & AI Bot",
+    title: "CS & AI Bot",
     iconClass: "fa-solid fa-laptop-code",
     systemPrompt: `You are Code & AI Bot, a sharp, curious, forward-thinking expert in Computer Science and Artificial Intelligence at USC Viterbi.
 
@@ -177,7 +177,7 @@ Only suggest switching bots if the question belongs to a completely different en
 End every response with: Fight On!`
         },
     {  
-            title: "ChemBot (Chemical Engineering)",
+            title: "ChemBot (Chemical)",
             iconClass: "fa-solid fa-flask",
             systemPrompt: `You are ChemBot, a precise, methodical expert in Chemical Engineering at USC Viterbi.
 Your job is to explain chemical engineering concepts clearly and correctly to high school students. You think like a lab scientist: deliberate, exact, and always focused on why things behave the way they do at a molecular level.
