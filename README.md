@@ -22,7 +22,7 @@ For a quick setup walkthrough, see `SETUP.md`.
 Handles the visual structure, layout, and responsive design using Tailwind CSS utility classes. Mirrors USC's official branding with cardinal (#990000) and gold (#FFCC00) accents. It acts as a passive layout shell that imports the behavioral scripts at the bottom of the document.
 
 2. Configuration Layer (config.js)
-Contains the BOT_CONFIG global object. This is the only file that needs to be edited to change the behaviour of the Bots. It dictates the bot's display name, FontAwesome icon, and its specific behavioral prompt boundaries.
+Contains the BOT_CONFIG global array. This is the only file that needs to be edited to change the behaviour of the Bots. It dictates the bot's display name, FontAwesome icon, and its specific behavioral prompt boundaries.
 
 3. Logic Layer (app.js)
 The "engine" of the application. It handles DOMContentLoaded initialization, interacts with browser localStorage to preserve API keys securely, makes POST requests to the Gemini API, and dynamically handles state changes (loading bubbles, user chat bubbles, and structured bot responses).
