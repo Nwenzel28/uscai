@@ -102,6 +102,51 @@
             transform: scale(1.12);
         }
 
+        /* Streaming cursor: blinking bar appended to the end of an in-progress bot reply */
+        .stream-cursor {
+            display: inline-block;
+            width: 2px;
+            height: 0.9em;
+            background: #990000;
+            margin-left: 1px;
+            vertical-align: text-bottom;
+            animation: stream-blink 0.9s step-end infinite;
+        }
+        @keyframes stream-blink {
+            50% { opacity: 0; }
+        }
+
+        /* Copy / regenerate action row: hidden until the bubble (or its row) is hovered or focused */
+        .msg-actions {
+            opacity: 0;
+            transition: opacity 120ms ease-out;
+        }
+        .msg-row:hover .msg-actions,
+        .msg-row:focus-within .msg-actions,
+        .msg-actions:focus-within {
+            opacity: 1;
+        }
+        .msg-action-btn {
+            transition: background-color 100ms ease-out, color 100ms ease-out;
+        }
+
+        .msg-timestamp {
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* Scroll-to-latest button */
+        #scrollToBottomBtn {
+            opacity: 0;
+            pointer-events: none;
+            transform: translate(-50%, 6px);
+            transition: opacity 150ms ease-out, transform 150ms ease-out;
+        }
+        #scrollToBottomBtn.visible {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translate(-50%, 0);
+        }
+
         /* Print / Save chat: hidden on screen, becomes the entire page when printing */
         .print-only { display: none; }
         @media print {
@@ -214,23 +259,37 @@
         <div class="flex-grow w-full flex flex-col overflow-hidden min-h-0">
 
             <!-- Scrollbar stays at the screen edge; messages stay centered inside -->
-            <div
-                id="chatHistory"
-                class="flex-grow min-h-0 overflow-y-auto overflow-x-hidden"
-                aria-live="polite"
-                aria-label="Conversation"
-            >
-                <div id="chatStream" class="max-w-2xl mx-auto w-full px-4 py-6 space-y-5">
-                    <!-- Static welcome message (icon updated on load by JS) -->
-                    <div class="flex gap-3">
-                        <div class="w-7 h-7 rounded-full bg-gold/30 flex items-center justify-center text-cardinal shrink-0 mt-0.5">
-                            <i id="welcomeIcon" class="fa-solid fa-robot text-xs" aria-hidden="true"></i>
-                        </div>
-                        <div class="bg-white border border-stone-200 text-stone-800 px-4 py-3 rounded-2xl rounded-tl-sm text-sm leading-relaxed max-w-[85%]">
-                            Fight On! I'm your engineering advisor. Save your API key above, pick an advisor below, and ask me anything about the field.
+            <div class="relative flex-grow min-h-0">
+                <div
+                    id="chatHistory"
+                    class="h-full overflow-y-auto overflow-x-hidden"
+                    aria-live="polite"
+                    aria-label="Conversation"
+                    onscroll="handleChatScroll()"
+                >
+                    <div id="chatStream" class="max-w-2xl mx-auto w-full px-4 py-6 space-y-5">
+                        <!-- Static welcome message (icon updated on load by JS) -->
+                        <div class="flex gap-3">
+                            <div class="w-7 h-7 rounded-full bg-gold/30 flex items-center justify-center text-cardinal shrink-0 mt-0.5">
+                                <i id="welcomeIcon" class="fa-solid fa-robot text-xs" aria-hidden="true"></i>
+                            </div>
+                            <div class="bg-white border border-stone-200 text-stone-800 px-4 py-3 rounded-2xl rounded-tl-sm text-sm leading-relaxed max-w-[85%]">
+                                Fight On! I'm your engineering advisor. Save your API key above, pick an advisor below, and ask me anything about the field.
+                            </div>
                         </div>
                     </div>
                 </div>
+
+                <!-- Appears when the user has scrolled up; jumps back to the latest message -->
+                <button
+                    id="scrollToBottomBtn"
+                    onclick="scrollChatToBottom(true)"
+                    aria-label="Scroll to latest message"
+                    title="Scroll to latest"
+                    class="absolute bottom-3 left-1/2 w-8 h-8 rounded-full bg-stone-800 hover:bg-stone-900 text-white shadow-lg flex items-center justify-center transition-colors"
+                >
+                    <i class="fa-solid fa-arrow-down text-xs" aria-hidden="true"></i>
+                </button>
             </div>
 
             <!-- Composer: anchored to the bottom, blends into the page bg -->
@@ -271,14 +330,15 @@
                             ></div>
                         </div>
 
-                        <!-- Send -->
+                        <!-- Send / Stop: same button, swaps icon + handler while a reply is streaming -->
                         <button
                             id="sendBtn"
-                            onclick="sendMessage()"
+                            onclick="handleSendButtonClick()"
                             aria-label="Send message"
+                            title="Send message"
                             class="bg-stone-800 hover:bg-stone-900 text-white w-9 h-9 rounded-full text-sm transition duration-150 flex items-center justify-center shrink-0"
                         >
-                            <i class="fa-solid fa-paper-plane text-xs" aria-hidden="true"></i>
+                            <i id="sendBtnIcon" class="fa-solid fa-paper-plane text-xs" aria-hidden="true"></i>
                         </button>
                     </div>
                 </div>
