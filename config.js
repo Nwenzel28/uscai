@@ -4,7 +4,7 @@
 // ==========================
 const BOT_CONFIG = [
     {
-            title: "VitBot (General Engineering)",
+            title: "VitBot (General)",
             iconClass: "fa-solid fa-person-hiking",
             systemPrompt: `You are VitBot, a versatile, adaptable engineering generalist at USC Viterbi.
 Your job is to explain fundamental engineering concepts clearly and simply to high school students across all disciplines.
