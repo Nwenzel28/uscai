@@ -111,8 +111,8 @@ document.addEventListener('DOMContentLoaded', () => {
         input.value = '';
 
         // brief confirmation flash on both glyphs before the popup closes itself
-        document.getElementById('cmdKeySymbol').classList.add('key-symbol-active');
-        document.getElementById('vKeySymbol').classList.add('key-symbol-active');
+        setKeySymbolActive(document.getElementById('cmdKeySymbol'), true);
+        setKeySymbolActive(document.getElementById('vKeySymbol'), true);
         refreshKeyState();
         setTimeout(closeKeyPopup, 220);
     });
@@ -235,26 +235,36 @@ function closeKeyPopup() {
     window.removeEventListener('keyup', handleKeySymbolUp);
 }
 
+// Toggle a glyph's active state. Color is swapped via Tailwind's own class
+// (rather than a custom CSS class) so it isn't at the mercy of stylesheet
+// injection order — Tailwind's CDN build injects its rules after our inline
+// <style> block, so a same-specificity custom class was silently losing.
+function setKeySymbolActive(el, active) {
+    el.classList.toggle('key-symbol-active', active); // scale only
+    el.classList.toggle('text-gold', active);
+    el.classList.toggle('text-stone-300', !active);
+}
+
 function resetKeySymbols() {
-    document.getElementById('cmdKeySymbol').classList.remove('key-symbol-active');
-    document.getElementById('vKeySymbol').classList.remove('key-symbol-active');
+    setKeySymbolActive(document.getElementById('cmdKeySymbol'), false);
+    setKeySymbolActive(document.getElementById('vKeySymbol'), false);
 }
 
 // Light up the Cmd/Ctrl and V glyphs while they're actually held down
 function handleKeySymbolDown(e) {
     if (e.key === 'Meta' || e.key === 'Control') {
-        document.getElementById('cmdKeySymbol').classList.add('key-symbol-active');
+        setKeySymbolActive(document.getElementById('cmdKeySymbol'), true);
     }
     if (e.key && e.key.toLowerCase() === 'v') {
-        document.getElementById('vKeySymbol').classList.add('key-symbol-active');
+        setKeySymbolActive(document.getElementById('vKeySymbol'), true);
     }
 }
 function handleKeySymbolUp(e) {
     if (e.key === 'Meta' || e.key === 'Control') {
-        document.getElementById('cmdKeySymbol').classList.remove('key-symbol-active');
+        setKeySymbolActive(document.getElementById('cmdKeySymbol'), false);
     }
     if (e.key && e.key.toLowerCase() === 'v') {
-        document.getElementById('vKeySymbol').classList.remove('key-symbol-active');
+        setKeySymbolActive(document.getElementById('vKeySymbol'), false);
     }
 }
 
