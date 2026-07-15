@@ -7,6 +7,7 @@ let isSending = false;
 let conversationHistory = []; // Gemini-format turns: {role:'user'|'model', parts:[{text}]}. Resets on bot switch / clear.
 let bubbleCounter = 0; // guarantees unique bubble ids even when two bubbles are appended in the same millisecond
 let confirmAction = null; // callback wired up by showConfirm(), run by the modal's action button
+let hasInteracted = false; // true once the user has sent at least one message this session (drives Clear button state)
 
 // Matches max-h-[140px] on #userInput
 const COMPOSER_MAX_HEIGHT = 140;
@@ -66,6 +67,19 @@ function closePanel(el) {
     setTimeout(() => el.classList.add('hidden'), 120);
 }
 
+function setButtonEnabled(btn, enabled) {
+    btn.disabled = !enabled;
+    btn.classList.toggle('opacity-30', !enabled);
+    btn.classList.toggle('cursor-not-allowed', !enabled);
+}
+
+// Clear chat only needs *something on screen* to be worth resetting.
+// Save chat needs an actual recorded exchange, since that's what gets exported.
+function updateChatActionButtons() {
+    setButtonEnabled(document.getElementById('clearChatBtn'), hasInteracted);
+    setButtonEnabled(document.getElementById('saveChatBtn'), conversationHistory.length > 0);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     populateBotPicker();
     updateBotUI();
@@ -76,6 +90,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     setSendButtonState(false);
+    updateChatActionButtons();
+
+    // No key saved yet — open the popup automatically so setup is the first thing you see
+    if (!localStorage.getItem('gemini_api_key')) {
+        setTimeout(openKeyPopup, 300); // let the entrance animations settle first
+    }
 
     // Close open panels on outside click
     document.addEventListener('click', (e) => {
@@ -92,12 +112,22 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Escape closes whatever's open, most-specific first
+    // Escape closes whatever's open, most-specific first. Alt+1..9 jumps straight to an advisor.
     document.addEventListener('keydown', (e) => {
-        if (e.key !== 'Escape') return;
-        if (!document.getElementById('confirmOverlay').classList.contains('hidden')) { hideConfirm(); return; }
-        if (!document.getElementById('keyPopup').classList.contains('hidden')) { closeKeyPopup(); return; }
-        if (!document.getElementById('botPickerMenu').classList.contains('hidden')) { closeBotPicker(); return; }
+        if (e.key === 'Escape') {
+            if (!document.getElementById('confirmOverlay').classList.contains('hidden')) { hideConfirm(); return; }
+            if (!document.getElementById('keyPopup').classList.contains('hidden')) { closeKeyPopup(); return; }
+            if (!document.getElementById('botPickerMenu').classList.contains('hidden')) { closeBotPicker(); return; }
+            return;
+        }
+
+        if (e.altKey && !e.ctrlKey && !e.metaKey && /^[1-9]$/.test(e.key)) {
+            const i = Number(e.key) - 1;
+            if (i < BOT_CONFIG.length) {
+                e.preventDefault();
+                selectBot(i);
+            }
+        }
     });
 
     // Capture pastes into the invisible key field directly
@@ -136,6 +166,7 @@ function populateBotPicker() {
         opt.innerHTML = `
             <i class="${bot.iconClass} text-cardinal text-xs w-4 text-center shrink-0" aria-hidden="true"></i>
             <span class="flex-grow text-stone-700 truncate">${bot.title}</span>
+            ${i < 9 ? `<span class="text-[10px] text-stone-300 font-mono shrink-0" aria-hidden="true">⌥${i + 1}</span>` : ''}
             <i class="fa-solid fa-check text-cardinal text-xs shrink-0 ${i === currentBotIndex ? '' : 'invisible'}" aria-hidden="true"></i>`;
         menu.appendChild(opt);
     });
@@ -170,9 +201,11 @@ function closeBotPicker() {
 function selectBot(i) {
     currentBotIndex = i;
     conversationHistory = []; // new advisor, new context
+    hasInteracted = false;
     updateBotUI();
     populateBotPicker(); // refresh checkmarks
     closeBotPicker();
+    updateChatActionButtons();
     appendMessage(
         `Fight On! I'm ${BOT_CONFIG[currentBotIndex].title}. How can I help you today?`,
         'bot'
@@ -286,13 +319,62 @@ function requestClearKey() {
 function clearChat() {
     showConfirm('Clear this conversation? This cannot be undone.', 'Clear chat', () => {
         conversationHistory = [];
+        hasInteracted = false;
         getChatMessageStream().innerHTML = '';
+        updateChatActionButtons();
         appendMessage(
             `Fight On! I'm ${BOT_CONFIG[currentBotIndex].title}. How can I help you today?`,
             'bot'
         );
         document.getElementById('userInput').focus();
     });
+}
+
+// ---------------------------------------------------------------------------
+// Save chat — renders a clean, branded transcript into a print-only container
+// and hands off to the browser's native print dialog (Save as PDF works
+// everywhere without pulling in a PDF-generation library over the network).
+// ---------------------------------------------------------------------------
+
+function saveChat() {
+    if (conversationHistory.length === 0) return;
+
+    const bot = BOT_CONFIG[currentBotIndex];
+    const container = document.getElementById('printTranscript');
+    container.innerHTML = '';
+
+    const now = new Date();
+    const header = document.createElement('div');
+    header.className = 'print-doc-header';
+    header.innerHTML = `
+        <div class="print-doc-title">USC Viterbi — Discover Engineering</div>
+        <div class="print-doc-subtitle">${bot.title} · Conversation Transcript</div>
+        <div class="print-doc-meta">${now.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })} at ${now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</div>`;
+    container.appendChild(header);
+
+    conversationHistory.forEach((turn) => {
+        const text = (turn.parts && turn.parts[0] && turn.parts[0].text) || '';
+        const block = document.createElement('div');
+        block.className = 'print-turn';
+
+        const role = document.createElement('div');
+        role.className = turn.role === 'user' ? 'print-role print-role-user' : 'print-role print-role-bot';
+        role.textContent = turn.role === 'user' ? 'You' : bot.title;
+        block.appendChild(role);
+
+        const body = document.createElement('div');
+        body.className = 'print-body';
+        if (turn.role === 'user') {
+            body.textContent = text; // plain text: never render raw user input as markup
+        } else {
+            body.innerHTML = sanitizeRenderedHTML(marked.parse(text));
+        }
+        block.appendChild(body);
+
+        container.appendChild(block);
+    });
+
+    window.print();
 }
 
 // ---------------------------------------------------------------------------
@@ -361,6 +443,8 @@ async function sendMessage() {
     setComposerBusy(true);
 
     appendMessage(userText, 'user');
+    hasInteracted = true;
+    updateChatActionButtons();
     input.value = '';
     autoResizeInput();
 
@@ -409,6 +493,7 @@ async function sendMessage() {
     } finally {
         isSending = false;
         setComposerBusy(false);
+        updateChatActionButtons();
         input.focus();
     }
 }

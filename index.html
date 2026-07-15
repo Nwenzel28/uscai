@@ -101,6 +101,35 @@
         .key-symbol-active {
             transform: scale(1.12);
         }
+
+        /* Print / Save chat: hidden on screen, becomes the entire page when printing */
+        .print-only { display: none; }
+        @media print {
+            body * { visibility: hidden; }
+            #printTranscript, #printTranscript * { visibility: visible; }
+            #printTranscript {
+                display: block;
+                position: absolute;
+                top: 0; left: 0;
+                width: 100%;
+                padding: 0.5in;
+            }
+            .print-doc-header {
+                border-bottom: 2px solid #990000;
+                padding-bottom: 10px;
+                margin-bottom: 22px;
+            }
+            .print-doc-title { font-family: 'Poppins', sans-serif; font-weight: 700; font-size: 18px; color: #990000; }
+            .print-doc-subtitle { font-size: 13px; color: #292524; margin-top: 2px; }
+            .print-doc-meta { font-size: 11px; color: #767676; margin-top: 2px; }
+            .print-turn { margin-bottom: 16px; page-break-inside: avoid; }
+            .print-role { font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px; }
+            .print-role-user { color: #292524; }
+            .print-role-bot { color: #990000; }
+            .print-body { font-size: 13px; line-height: 1.55; color: #1c1917; }
+            .print-body p { margin: 0 0 8px; }
+            .print-body ul, .print-body ol { margin: 0 0 8px 1.2em; }
+        }
     </style>
 </head>
 <body class="bg-stone-50 h-screen flex flex-col overflow-hidden">
@@ -116,11 +145,22 @@
         </div>
         <div class="flex items-center gap-1">
             <button
+                id="saveChatBtn"
+                onclick="saveChat()"
+                aria-label="Save chat as PDF"
+                title="Save chat as PDF"
+                disabled
+                class="opacity-30 cursor-not-allowed w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center transition"
+            >
+                <i class="fa-solid fa-file-arrow-down text-sm text-gold/90"></i>
+            </button>
+            <button
                 id="clearChatBtn"
                 onclick="clearChat()"
                 aria-label="Clear chat"
                 title="Clear chat"
-                class="w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center transition"
+                disabled
+                class="opacity-30 cursor-not-allowed w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center transition"
             >
                 <i class="fa-solid fa-broom text-sm text-gold/90"></i>
             </button>
@@ -268,6 +308,9 @@
             </div>
         </div>
     </div>
+
+    <!-- Populated by saveChat(); invisible on screen, becomes the whole page when printing -->
+    <div id="printTranscript" class="print-only"></div>
 
     <script src="config.js"></script>
     <script src="app.js"></script>
