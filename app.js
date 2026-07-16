@@ -407,7 +407,9 @@ function clearChat() {
         hasInteracted = false;
         getChatMessageStream().innerHTML = '';
         updateChatActionButtons();
-        appendStaticMessage(BOT_CONFIG[currentBotIndex].greeting);
+        appendStaticMessage(
+        `Fight On! I'm ${BOT_CONFIG[currentBotIndex].title}. How can I help you today?`
+        );
         document.getElementById('userInput').focus();
     });
 }
