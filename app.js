@@ -283,7 +283,9 @@ function selectBot(i) {
     currentBotIndex = i;
     updateBotUI();
     updateBotPickerSelection();
-    appendStaticMessage(BOT_CONFIG[currentBotIndex].greeting);
+    appendStaticMessage(
+        `Fight On! I'm ${BOT_CONFIG[currentBotIndex].title}. How can I help you today?`
+    );
     document.getElementById('userInput').focus();
 }
 
@@ -398,7 +400,7 @@ function requestClearKey() {
 // ---------------------------------------------------------------------------
 
 function clearChat() {
-    showConfirm('Clear this entire conversation across all advisors? This cannot be undone.', 'Clear chat', () => {
+    showConfirm('Clear this entire conversation? Cannot be undone.', 'Clear chat', () => {
         if (isSending) stopGeneration();
         botHistories = {};
         transcript = [];
