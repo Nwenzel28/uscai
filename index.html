@@ -292,8 +292,11 @@
                 </button>
             </div>
 
-            <!-- Credit badge: same pill shape/scale as the advisor picker, docked in the corner above the composer -->
-            <div class="px-4 flex justify-end shrink-0">
+            <!-- Credit badge (narrow/medium screens): in-flow, right-aligned just above the composer,
+                 so it can never overlap the send button. Once the viewport is wide enough that the
+                 centered composer no longer spans near the full width (lg+), this is hidden in favor
+                 of the fixed corner badge below, which sits in the actual clear space beside it. -->
+            <div class="lg:hidden px-4 flex justify-end shrink-0">
                 <span class="inline-flex items-center gap-1.5 border border-stone-300 rounded-full pl-3 pr-3.5 py-1 text-[11px] font-medium text-stone-500 bg-stone-50">
                     <i class="fa-solid fa-people-group text-cardinal text-xs shrink-0" aria-hidden="true"></i>
                     Made by Team 1
@@ -354,6 +357,16 @@
 
         </div>
     </main>
+
+    <!-- Credit badge (wide screens): true bottom-right corner of the screen. Only shown at lg+,
+         where the centered composer leaves clear space beside it — below that breakpoint the
+         in-flow variant above the composer is used instead so it never overlaps the send button. -->
+    <div class="hidden lg:block fixed bottom-4 right-4 z-20">
+        <span class="inline-flex items-center gap-1.5 border border-stone-300 rounded-full pl-3 pr-3.5 py-1.5 text-xs font-medium text-stone-500 bg-stone-50/95 backdrop-blur-sm shadow-sm">
+            <i class="fa-solid fa-people-group text-cardinal text-xs shrink-0" aria-hidden="true"></i>
+            Made by Team 1
+        </span>
+    </div>
 
     <!-- Integrated confirm modal: replaces native window.confirm() for clear-chat / clear-key -->
     <div
