@@ -131,17 +131,21 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(openKeyPopup, 300); // let the entrance animations settle first
     }
 
-    // Close open panels on outside click
+    // Close open panels on outside click. composedPath() is used instead of
+    // e.target/.contains() because it reflects the click's original path even
+    // if an element it passed through gets removed from the DOM by another
+    // handler (e.g. a selection re-render) before this listener runs.
     document.addEventListener('click', (e) => {
-        const botWrap = document.getElementById('botPickerWrap');
+        const path = e.composedPath();
+
         const botMenu = document.getElementById('botPickerMenu');
-        if (!botMenu.classList.contains('hidden') && !botWrap.contains(e.target)) {
+        if (!botMenu.classList.contains('hidden') && !path.includes(document.getElementById('botPickerWrap'))) {
             closeBotPicker();
         }
 
         const keyPopup = document.getElementById('keyPopup');
         const settingsBtn = document.getElementById('settingsBtn');
-        if (!keyPopup.classList.contains('hidden') && !keyPopup.contains(e.target) && e.target !== settingsBtn && !settingsBtn.contains(e.target)) {
+        if (!keyPopup.classList.contains('hidden') && !path.includes(keyPopup) && !path.includes(settingsBtn)) {
             closeKeyPopup();
         }
     });
@@ -197,7 +201,10 @@ function populateBotPicker() {
         opt.setAttribute('role', 'option');
         opt.setAttribute('aria-selected', String(i === currentBotIndex));
         opt.className = 'w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left hover:bg-stone-50 transition';
-        opt.onclick = () => selectBot(i);
+        // stopPropagation: this click must not also reach the document-level
+        // "click outside closes the menu" listener, or the two handlers can
+        // race against each other once selectBot() starts mutating the DOM.
+        opt.onclick = (e) => { e.stopPropagation(); selectBot(i); };
 
         opt.innerHTML = `
             <i class="${bot.iconClass} text-cardinal text-xs w-4 text-center shrink-0" aria-hidden="true"></i>
@@ -205,6 +212,20 @@ function populateBotPicker() {
             ${i < 9 ? `<span class="text-[10px] text-stone-300 font-mono shrink-0" aria-hidden="true">⌥${i + 1}</span>` : ''}
             <i class="fa-solid fa-check text-cardinal text-xs shrink-0 ${i === currentBotIndex ? '' : 'invisible'}" aria-hidden="true"></i>`;
         menu.appendChild(opt);
+    });
+}
+
+// Updates aria-selected + the checkmark on the *existing* option buttons,
+// rather than tearing them down and rebuilding — populateBotPicker() already
+// ran once at startup, and rebuilding mid-click was the source of a race
+// where the dropdown could fail to close/select reliably.
+function updateBotPickerSelection() {
+    const menu = document.getElementById('botPickerMenu');
+    Array.from(menu.children).forEach((opt, i) => {
+        const selected = i === currentBotIndex;
+        opt.setAttribute('aria-selected', String(selected));
+        const check = opt.querySelector('.fa-check');
+        if (check) check.classList.toggle('invisible', !selected);
     });
 }
 
@@ -241,7 +262,7 @@ function selectBot(i) {
     hasInteracted = false;
     lastUserText = null;
     updateBotUI();
-    populateBotPicker(); // refresh checkmarks
+    updateBotPickerSelection(); // reflect the new pick without tearing down the option buttons
     closeBotPicker();
     updateChatActionButtons();
     getChatMessageStream().innerHTML = '';
@@ -255,7 +276,11 @@ function updateBotUI() {
     const bot = BOT_CONFIG[currentBotIndex];
     document.getElementById('botSelectorIcon').className = bot.iconClass + ' text-cardinal text-xs shrink-0';
     document.getElementById('botPickerLabel').textContent = bot.title;
-    document.getElementById('welcomeIcon').className = bot.iconClass + ' text-xs';
+    // #welcomeIcon only exists in the initial static greeting bubble, which
+    // gets cleared out on the first bot switch — guard it so a missing icon
+    // doesn't throw and silently abort the rest of selectBot().
+    const welcomeIcon = document.getElementById('welcomeIcon');
+    if (welcomeIcon) welcomeIcon.className = bot.iconClass + ' text-xs';
     document.getElementById('userInput').placeholder = `Ask ${bot.title} a question…`;
 }
 
@@ -593,50 +618,49 @@ async function requestBotReply(apiKey) {
         const decoder = new TextDecoder();
         let buffer = '';
 
-        while (true) {
-            const { done, value } = await reader.read();
-            if (value) {
-                buffer += decoder.decode(value, { stream: true });
+        // Pulls out any complete "data: {...}" events from an SSE buffer and applies
+        // each one, returning whatever incomplete tail should carry over to the next read.
+        const consumeEvents = (buf) => {
+            // SSE events are separated by a blank line; tolerate \n\n or \r\n\r\n.
+            const parts = buf.split(/\r?\n\r?\n/);
+            const remainder = parts.pop();
+
+            for (const evt of parts) {
+                const line = evt.split(/\r?\n/).find((l) => l.startsWith('data:'));
+                if (!line) continue;
+                const jsonStr = line.slice(5).trim();
+                if (!jsonStr || jsonStr === '[DONE]') continue;
+
+                try {
+                    const parsed = JSON.parse(jsonStr);
+                    const piece = parsed && parsed.candidates && parsed.candidates[0]
+                        && parsed.candidates[0].content && parsed.candidates[0].content.parts
+                        && parsed.candidates[0].content.parts[0] && parsed.candidates[0].content.parts[0].text;
+                    if (piece) {
+                        fullText += piece;
+                        sawAnyText = true;
+                        updateBotStream(stream, fullText);
+                    }
+                } catch (_) { /* ignore partial/malformed SSE frames */ }
             }
 
-            let lineBreakIndex;
-            // Robust line-by-line parsing
-            while ((lineBreakIndex = buffer.indexOf('\n')) !== -1) {
-                const line = buffer.slice(0, lineBreakIndex).trim();
-                buffer = buffer.slice(lineBreakIndex + 1);
+            return remainder;
+        };
 
-                if (line.startsWith('data:')) {
-                    const jsonStr = line.slice(5).trim();
-                    try {
-                        const parsed = JSON.parse(jsonStr);
-                        const piece = parsed && parsed.candidates && parsed.candidates[0]
-                            && parsed.candidates[0].content && parsed.candidates[0].content.parts
-                            && parsed.candidates[0].content.parts[0] && parsed.candidates[0].content.parts[0].text;
-                        if (piece) {
-                            fullText += piece;
-                            sawAnyText = true;
-                            updateBotStream(stream, fullText);
-                        }
-                    } catch (_) { /* ignore partial/malformed SSE frames */ }
-                }
+        while (true) {
+            const { done, value } = await reader.read();
+
+            if (value) {
+                buffer += decoder.decode(value, { stream: true });
+                buffer = consumeEvents(buffer);
             }
 
             if (done) {
-                // Flush and process any leftover content in the buffer that didn't end with a newline
-                const remainingLine = buffer.trim();
-                if (remainingLine.startsWith('data:')) {
-                    const jsonStr = remainingLine.slice(5).trim();
-                    try {
-                        const parsed = JSON.parse(jsonStr);
-                        const piece = parsed && parsed.candidates && parsed.candidates[0]
-                            && parsed.candidates[0].content && parsed.candidates[0].content.parts
-                            && parsed.candidates[0].content.parts[0] && parsed.candidates[0].content.parts[0].text;
-                        if (piece) {
-                            fullText += piece;
-                            sawAnyText = true;
-                            updateBotStream(stream, fullText);
-                        }
-                    } catch (_) { /* ignore partial/malformed SSE frames */ }
+                // The stream can end mid-buffer with no trailing blank line (common for
+                // short replies) — flush whatever's left instead of silently dropping it.
+                buffer += decoder.decode(); // flush any pending multi-byte characters
+                if (buffer.trim()) {
+                    consumeEvents(buffer + '\n\n');
                 }
                 break;
             }
