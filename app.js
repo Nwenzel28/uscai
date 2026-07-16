@@ -4,16 +4,16 @@
 
 let currentBotIndex = 0;
 let isSending = false;
-let conversationHistory = []; // Gemini-format turns: {role:'user'|'model', parts:[{text}]}. Resets on bot switch / clear.
+let botHistories = {}; // per-bot Gemini-format context: { [botIndex]: [{role:'user'|'model', parts:[{text}]}] }.
+                        // Kept separate per bot so no advisor ever sees what you asked a different one.
+let transcript = [];   // full ordered session log across ALL bots — {kind:'message', role, botIndex, text, id, timestamp}.
+                        // This is what "Save chat" exports; it's independent of the per-bot API context above.
+let transcriptCounter = 0;
 let bubbleCounter = 0; // guarantees unique bubble ids even when two bubbles are appended in the same millisecond
 let confirmAction = null; // callback wired up by showConfirm(), run by the modal's action button
 let hasInteracted = false; // true once the user has sent at least one message this session (drives Clear button state)
 let activeAbortController = null; // lets the Stop button cancel an in-flight streaming request
-let lastUserText = null; // the most recently sent user message, kept around for Retry / Regenerate
 let stickToBottom = true; // whether new messages should auto-scroll (false once the user scrolls up to read history)
-let sessionId = 0; // bumped whenever the conversation is reset (bot switch / clear chat); lets an in-flight
-                    // request from the previous session detect it's stale and bail out instead of writing
-                    // its result into the new conversation.
 
 // Matches max-h-[140px] on #userInput
 const COMPOSER_MAX_HEIGHT = 140;
@@ -25,6 +25,19 @@ function getChatContainer() {
 
 function getChatMessageStream() {
     return document.getElementById('chatStream') || getChatContainer();
+}
+
+// Each bot's own conversation array, created on first use. Never shared across bots.
+function getCurrentHistory() {
+    if (!botHistories[currentBotIndex]) botHistories[currentBotIndex] = [];
+    return botHistories[currentBotIndex];
+}
+
+function logTranscript(entry) {
+    entry.id = 't' + (transcriptCounter++);
+    entry.timestamp = entry.timestamp || new Date();
+    transcript.push(entry);
+    return entry.id;
 }
 
 // ---------------------------------------------------------------------------
@@ -111,10 +124,10 @@ function setButtonEnabled(btn, enabled) {
 }
 
 // Clear chat only needs *something on screen* to be worth resetting.
-// Save chat needs an actual recorded exchange, since that's what gets exported.
+// Save chat needs at least one real exchange recorded anywhere in the session.
 function updateChatActionButtons() {
     setButtonEnabled(document.getElementById('clearChatBtn'), hasInteracted);
-    setButtonEnabled(document.getElementById('saveChatBtn'), conversationHistory.length > 0);
+    setButtonEnabled(document.getElementById('saveChatBtn'), transcript.some((e) => e.kind === 'message'));
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -258,21 +271,20 @@ function closeBotPicker() {
     document.getElementById('botPickerChevron').classList.remove('rotate-180');
 }
 
+// Switching advisors no longer clears the conversation — the visible chat is
+// one continuous session. Each bot still only ever sees its own messages
+// (see getCurrentHistory()); the bot's own greeting line, appended in place,
+// is what marks the handoff instead of a separate "switched to X" notice.
 function selectBot(i) {
+    closeBotPicker();
+    if (i === currentBotIndex) return; // re-selecting the current bot is just a no-op close
+
     if (isSending) stopGeneration();
     currentBotIndex = i;
-    sessionId++; // invalidate any reply still in flight from the previous bot
-    conversationHistory = []; // new advisor, new context
-    hasInteracted = false;
-    lastUserText = null;
     updateBotUI();
-    updateBotPickerSelection(); // reflect the new pick without tearing down the option buttons
-    closeBotPicker();
-    updateChatActionButtons();
-    getChatMessageStream().innerHTML = '';
-    appendStaticMessage(
-        `Fight On! I'm ${BOT_CONFIG[currentBotIndex].title}. How can I help you today?`
-    );
+    updateBotPickerSelection();
+    appendStaticMessage(BOT_CONFIG[currentBotIndex].greeting);
+    document.getElementById('userInput').focus();
 }
 
 // Sync icon + label + placeholder to whichever advisor is active
@@ -281,8 +293,8 @@ function updateBotUI() {
     document.getElementById('botSelectorIcon').className = bot.iconClass + ' text-cardinal text-xs shrink-0';
     document.getElementById('botPickerLabel').textContent = bot.title;
     // #welcomeIcon only exists in the initial static greeting bubble, which
-    // gets cleared out on the first bot switch — guard it so a missing icon
-    // doesn't throw and silently abort the rest of selectBot().
+    // gets replaced by real messages as the session goes on — guard it so a
+    // missing icon doesn't throw and silently abort the rest of selectBot().
     const welcomeIcon = document.getElementById('welcomeIcon');
     if (welcomeIcon) welcomeIcon.className = bot.iconClass + ' text-xs';
     document.getElementById('userInput').placeholder = `Ask ${bot.title} a question…`;
@@ -380,35 +392,33 @@ function requestClearKey() {
 }
 
 // ---------------------------------------------------------------------------
-// Chat clearing
+// Chat clearing — the one action that still wipes everything, across every
+// advisor, since it's an explicit, confirmed request rather than a side
+// effect of switching.
 // ---------------------------------------------------------------------------
 
 function clearChat() {
-    showConfirm('Clear this conversation? This cannot be undone.', 'Clear chat', () => {
+    showConfirm('Clear this entire conversation across all advisors? This cannot be undone.', 'Clear chat', () => {
         if (isSending) stopGeneration();
-        sessionId++; // invalidate any reply still in flight
-        conversationHistory = [];
+        botHistories = {};
+        transcript = [];
         hasInteracted = false;
-        lastUserText = null;
         getChatMessageStream().innerHTML = '';
         updateChatActionButtons();
-        appendStaticMessage(
-            `Fight On! I'm ${BOT_CONFIG[currentBotIndex].title}. How can I help you today?`
-        );
+        appendStaticMessage(BOT_CONFIG[currentBotIndex].greeting);
         document.getElementById('userInput').focus();
     });
 }
 
 // ---------------------------------------------------------------------------
-// Save chat — renders a clean, branded transcript into a print-only container
-// and hands off to the browser's native print dialog (Save as PDF works
-// everywhere without pulling in a PDF-generation library over the network).
+// Save chat — renders the FULL session transcript (every advisor, in order)
+// into a print-only container and hands off to the browser's native print
+// dialog (Save as PDF works everywhere without a PDF library over the network).
 // ---------------------------------------------------------------------------
 
 function saveChat() {
-    if (conversationHistory.length === 0) return;
+    if (!transcript.some((e) => e.kind === 'message')) return;
 
-    const bot = BOT_CONFIG[currentBotIndex];
     const container = document.getElementById('printTranscript');
     container.innerHTML = '';
 
@@ -417,26 +427,26 @@ function saveChat() {
     header.className = 'print-doc-header';
     header.innerHTML = `
         <div class="print-doc-title">USC Viterbi — Discover Engineering</div>
-        <div class="print-doc-subtitle">${bot.title} · Conversation Transcript</div>
+        <div class="print-doc-subtitle">Full Conversation Transcript</div>
         <div class="print-doc-meta">${now.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })} at ${now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</div>`;
     container.appendChild(header);
 
-    conversationHistory.forEach((turn) => {
-        const text = (turn.parts && turn.parts[0] && turn.parts[0].text) || '';
+    transcript.forEach((entry) => {
+        const bot = BOT_CONFIG[entry.botIndex];
         const block = document.createElement('div');
         block.className = 'print-turn';
 
         const role = document.createElement('div');
-        role.className = turn.role === 'user' ? 'print-role print-role-user' : 'print-role print-role-bot';
-        role.textContent = turn.role === 'user' ? 'You' : bot.title;
+        role.className = entry.role === 'user' ? 'print-role print-role-user' : 'print-role print-role-bot';
+        role.textContent = entry.role === 'user' ? 'You' : bot.title;
         block.appendChild(role);
 
         const body = document.createElement('div');
         body.className = 'print-body';
-        if (turn.role === 'user') {
-            body.textContent = text; // plain text: never render raw user input as markup
+        if (entry.role === 'user') {
+            body.textContent = entry.text; // plain text: never render raw user input as markup
         } else {
-            body.innerHTML = sanitizeRenderedHTML(marked.parse(text));
+            body.innerHTML = sanitizeRenderedHTML(marked.parse(entry.text));
         }
         block.appendChild(body);
 
@@ -519,7 +529,10 @@ function scrollChatToBottom(force = false) {
 
 // ---------------------------------------------------------------------------
 // Sending messages — streams the reply token-by-token from Gemini so the
-// response appears progressively instead of arriving all at once.
+// response appears progressively instead of arriving all at once. Each
+// request carries its own bot index + history array explicitly, so it always
+// writes back to the right advisor's memory even if the user switches away
+// (or back) before it finishes.
 // ---------------------------------------------------------------------------
 
 async function sendMessage() {
@@ -536,54 +549,63 @@ async function sendMessage() {
     const userText = input.value.trim();
     if (!userText) return;
 
+    const botIndex = currentBotIndex;
     appendMessage(userText, 'user');
     hasInteracted = true;
     updateChatActionButtons();
     input.value = '';
     autoResizeInput();
 
-    // Add the new turn to memory *before* the call so the model sees it as part of the thread
-    conversationHistory.push({ role: 'user', parts: [{ text: userText }] });
-    lastUserText = userText;
+    // Add the new turn to this bot's own memory *before* the call so the model sees it as part of the thread
+    const history = getCurrentHistory();
+    history.push({ role: 'user', parts: [{ text: userText }] });
 
-    await requestBotReply(apiKey);
+    await requestBotReply(apiKey, botIndex, history);
 }
 
-// Regenerate: drop the last model turn (if any) and re-ask with the same history.
-function regenerateLastResponse() {
+// Regenerate: only supported for a bot's most recent reply, since removing an
+// earlier turn from the middle of that bot's history would desync its context.
+function regenerateResponse(botIndex, transcriptId) {
     if (isSending) return;
     const apiKey = localStorage.getItem('gemini_api_key');
     if (!apiKey) { openKeyPopup(); return; }
-    if (conversationHistory.length === 0) return;
 
-    const last = conversationHistory[conversationHistory.length - 1];
-    if (last.role === 'model') {
-        conversationHistory.pop();
-        const lastBotRow = getChatMessageStream().querySelector('.msg-row-bot:last-of-type');
-        if (lastBotRow) lastBotRow.remove();
-    }
+    const history = botHistories[botIndex];
+    if (!history || history.length === 0 || history[history.length - 1].role !== 'model') return;
 
-    requestBotReply(apiKey);
+    const idx = transcript.findIndex((e) => e.id === transcriptId);
+    // Only proceed if this is genuinely that bot's latest reply — guards against a
+    // stale click on an older bubble after further messages have already moved on.
+    const isLatestForBot = idx !== -1 && !transcript.slice(idx + 1).some((e) => e.kind === 'message' && e.botIndex === botIndex && e.role === 'model');
+    if (!isLatestForBot) return;
+
+    history.pop();
+    transcript.splice(idx, 1);
+    const row = document.querySelector(`[data-transcript-id="${transcriptId}"]`);
+    if (row) row.remove();
+
+    requestBotReply(apiKey, botIndex, history);
 }
 
-// Retry: the previous attempt never made it into history (failed calls pop their turn),
-// so just re-send the last user message.
-function retryLastMessage() {
-    if (isSending || !lastUserText) return;
+// Retry: the failed attempt's user turn was popped off that bot's history, so
+// push it back on and re-run the same request.
+function retryMessage(botIndex, history, text) {
+    if (isSending || !text) return;
     const apiKey = localStorage.getItem('gemini_api_key');
     if (!apiKey) { openKeyPopup(); return; }
 
-    conversationHistory.push({ role: 'user', parts: [{ text: lastUserText }] });
-    requestBotReply(apiKey);
+    history.push({ role: 'user', parts: [{ text }] });
+    requestBotReply(apiKey, botIndex, history);
 }
 
-// Shared streaming call used by send / regenerate / retry
-async function requestBotReply(apiKey) {
-    const mySession = sessionId; // if this stops matching sessionId later, the bot was switched mid-request
+// Shared streaming call used by send / regenerate / retry. botIndex + history
+// are captured at call time so this always resolves against the advisor it
+// was actually asked, regardless of whichever bot is selected by the time it finishes.
+async function requestBotReply(apiKey, botIndex, history) {
     isSending = true;
     setComposerBusy(true);
 
-    const stream = beginBotStream();
+    const stream = beginBotStream(botIndex);
     activeAbortController = new AbortController();
 
     let fullText = '';
@@ -597,8 +619,8 @@ async function requestBotReply(apiKey) {
                 headers: { 'Content-Type': 'application/json' },
                 signal: activeAbortController.signal,
                 body: JSON.stringify({
-                    contents: conversationHistory,
-                    systemInstruction: { parts: [{ text: BOT_CONFIG[currentBotIndex].systemPrompt }] },
+                    contents: history,
+                    systemInstruction: { parts: [{ text: BOT_CONFIG[botIndex].systemPrompt }] },
                     generationConfig: { maxOutputTokens: 800, temperature: 0.7 }
                 })
             }
@@ -615,10 +637,9 @@ async function requestBotReply(apiKey) {
                 message = "You're sending messages a little too fast. Wait a few seconds and try again.";
             }
 
-            if (mySession === sessionId) {
-                conversationHistory.pop(); // call failed — don't poison future turns with an unanswered message
-                failBotStream(stream, message, /* offerRetry */ true);
-            }
+            const popped = history.pop(); // call failed — don't poison future turns with an unanswered message
+            const failedText = popped && popped.parts && popped.parts[0] && popped.parts[0].text;
+            failBotStream(stream, message, () => retryMessage(botIndex, history, failedText));
             return;
         }
 
@@ -647,7 +668,7 @@ async function requestBotReply(apiKey) {
                     if (piece) {
                         fullText += piece;
                         sawAnyText = true;
-                        if (mySession === sessionId) updateBotStream(stream, fullText);
+                        updateBotStream(stream, fullText);
                     }
                 } catch (_) { /* ignore partial/malformed SSE frames */ }
             }
@@ -674,42 +695,37 @@ async function requestBotReply(apiKey) {
             }
         }
 
-        if (mySession !== sessionId) {
-            // The user switched bots (or cleared the chat) while this reply was still
-            // streaming. Drop it entirely — don't touch the new conversation or its DOM.
-            return;
-        }
-
         if (sawAnyText) {
-            conversationHistory.push({ role: 'model', parts: [{ text: fullText }] });
-            finalizeBotStream(stream, fullText);
+            history.push({ role: 'model', parts: [{ text: fullText }] });
+            const tId = logTranscript({ kind: 'message', role: 'model', botIndex, text: fullText });
+            finalizeBotStream(stream, fullText, false, botIndex, tId);
         } else {
-            conversationHistory.pop();
-            failBotStream(stream, 'Sorry — I could not generate a response this time.', true);
+            history.pop();
+            failBotStream(stream, 'Sorry — I could not generate a response this time.', () => retryMessage(botIndex, history, null));
         }
     } catch (err) {
-        if (mySession !== sessionId) return; // stale session — nothing left to safely clean up
-
         if (err && err.name === 'AbortError') {
             // User hit Stop: keep whatever text streamed in so far as the final answer,
             // rather than throwing it away.
             if (sawAnyText) {
-                conversationHistory.push({ role: 'model', parts: [{ text: fullText }] });
-                finalizeBotStream(stream, fullText, /* wasStopped */ true);
+                history.push({ role: 'model', parts: [{ text: fullText }] });
+                const tId = logTranscript({ kind: 'message', role: 'model', botIndex, text: fullText });
+                finalizeBotStream(stream, fullText, /* wasStopped */ true, botIndex, tId);
             } else {
-                conversationHistory.pop();
+                history.pop();
                 stream.row.remove();
             }
         } else {
-            conversationHistory.pop();
-            failBotStream(stream, 'Connection error: ' + err.message, true);
+            const popped = history.pop();
+            const failedText = popped && popped.parts && popped.parts[0] && popped.parts[0].text;
+            failBotStream(stream, 'Connection error: ' + err.message, () => retryMessage(botIndex, history, failedText));
         }
     } finally {
         activeAbortController = null;
         isSending = false;
         setComposerBusy(false);
         updateChatActionButtons();
-        if (mySession === sessionId) document.getElementById('userInput').focus();
+        document.getElementById('userInput').focus();
     }
 }
 
@@ -721,7 +737,7 @@ function formatTimestamp(date) {
     return date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 }
 
-// Plain, non-streaming messages: the welcome line and the "switched advisor" greeting
+// Plain, non-streaming messages: the welcome line and each bot's own greeting when switched to
 function appendStaticMessage(text) {
     appendMessage(text, 'bot-static');
 }
@@ -745,6 +761,7 @@ function appendMessage(text, sender) {
                 <span class="msg-timestamp text-[10px] text-stone-400 mt-1 mr-1">${now}</span>
             </div>`;
         row.querySelector('div.bg-stone-800').textContent = text; // textContent: never allow raw user input to become markup
+        logTranscript({ kind: 'message', role: 'user', botIndex: currentBotIndex, text });
 
     } else if (sender === 'bot-static') {
         row.className = 'msg-row msg-row-bot flex gap-3 message-enter message-enter-bot';
@@ -759,6 +776,7 @@ function appendMessage(text, sender) {
                 </div>
                 <span class="msg-timestamp text-[10px] text-stone-400 mt-1 ml-1">${now}</span>
             </div>`;
+        // Greeting lines are UI chrome, not part of any bot's actual API context or the exported transcript.
 
     } else if (sender === 'error') {
         row.className = 'flex justify-center';
@@ -777,9 +795,9 @@ function appendMessage(text, sender) {
 
 // --- Streaming bot bubble lifecycle: begin -> update (many times) -> finalize/fail ---
 
-function beginBotStream() {
+function beginBotStream(botIndex) {
     const history = getChatMessageStream();
-    const bot = BOT_CONFIG[currentBotIndex];
+    const bot = BOT_CONFIG[botIndex];
     const id = 'bubble-' + (bubbleCounter++);
 
     const row = document.createElement('div');
@@ -818,10 +836,11 @@ function updateBotStream(stream, textSoFar) {
     scrollChatToBottom();
 }
 
-function finalizeBotStream(stream, finalText, wasStopped) {
+function finalizeBotStream(stream, finalText, wasStopped, botIndex, transcriptId) {
     const formatted = sanitizeRenderedHTML(marked.parse(finalText || ''));
     stream.proseEl.classList.remove('typing-indicator', 'flex', 'items-center', 'gap-1', 'py-0.5');
     stream.proseEl.innerHTML = formatted;
+    stream.row.dataset.transcriptId = transcriptId; // lets regenerate find + remove this exact bubble later
 
     const now = formatTimestamp(new Date());
     stream.actionsEl.innerHTML = `
@@ -835,22 +854,22 @@ function finalizeBotStream(stream, finalText, wasStopped) {
 
     const [copyBtn, regenBtn] = stream.actionsEl.querySelectorAll('button');
     copyBtn.onclick = () => copyMessageText(finalText, copyBtn);
-    regenBtn.onclick = () => regenerateLastResponse();
+    regenBtn.onclick = () => regenerateResponse(botIndex, transcriptId);
 
     scrollChatToBottom();
 }
 
-function failBotStream(stream, message, offerRetry) {
+function failBotStream(stream, message, retryFn) {
     stream.row.remove();
     const errorId = appendMessage(message, 'error');
 
-    if (offerRetry && lastUserText) {
+    if (retryFn) {
         const row = document.getElementById(errorId);
         const pill = row.querySelector('div');
         const retryBtn = document.createElement('button');
         retryBtn.className = 'ml-1 underline decoration-dotted hover:text-red-900';
         retryBtn.textContent = 'Retry';
-        retryBtn.onclick = () => { row.remove(); retryLastMessage(); };
+        retryBtn.onclick = () => { row.remove(); retryFn(); };
         pill.appendChild(retryBtn);
     }
 }
