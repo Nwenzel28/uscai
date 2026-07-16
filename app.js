@@ -11,6 +11,9 @@ let hasInteracted = false; // true once the user has sent at least one message t
 let activeAbortController = null; // lets the Stop button cancel an in-flight streaming request
 let lastUserText = null; // the most recently sent user message, kept around for Retry / Regenerate
 let stickToBottom = true; // whether new messages should auto-scroll (false once the user scrolls up to read history)
+let sessionId = 0; // bumped whenever the conversation is reset (bot switch / clear chat); lets an in-flight
+                    // request from the previous session detect it's stale and bail out instead of writing
+                    // its result into the new conversation.
 
 // Matches max-h-[140px] on #userInput
 const COMPOSER_MAX_HEIGHT = 140;
@@ -258,6 +261,7 @@ function closeBotPicker() {
 function selectBot(i) {
     if (isSending) stopGeneration();
     currentBotIndex = i;
+    sessionId++; // invalidate any reply still in flight from the previous bot
     conversationHistory = []; // new advisor, new context
     hasInteracted = false;
     lastUserText = null;
@@ -382,6 +386,7 @@ function requestClearKey() {
 function clearChat() {
     showConfirm('Clear this conversation? This cannot be undone.', 'Clear chat', () => {
         if (isSending) stopGeneration();
+        sessionId++; // invalidate any reply still in flight
         conversationHistory = [];
         hasInteracted = false;
         lastUserText = null;
@@ -574,6 +579,7 @@ function retryLastMessage() {
 
 // Shared streaming call used by send / regenerate / retry
 async function requestBotReply(apiKey) {
+    const mySession = sessionId; // if this stops matching sessionId later, the bot was switched mid-request
     isSending = true;
     setComposerBusy(true);
 
@@ -609,8 +615,10 @@ async function requestBotReply(apiKey) {
                 message = "You're sending messages a little too fast. Wait a few seconds and try again.";
             }
 
-            conversationHistory.pop(); // call failed — don't poison future turns with an unanswered message
-            failBotStream(stream, message, /* offerRetry */ true);
+            if (mySession === sessionId) {
+                conversationHistory.pop(); // call failed — don't poison future turns with an unanswered message
+                failBotStream(stream, message, /* offerRetry */ true);
+            }
             return;
         }
 
@@ -639,7 +647,7 @@ async function requestBotReply(apiKey) {
                     if (piece) {
                         fullText += piece;
                         sawAnyText = true;
-                        updateBotStream(stream, fullText);
+                        if (mySession === sessionId) updateBotStream(stream, fullText);
                     }
                 } catch (_) { /* ignore partial/malformed SSE frames */ }
             }
@@ -666,6 +674,12 @@ async function requestBotReply(apiKey) {
             }
         }
 
+        if (mySession !== sessionId) {
+            // The user switched bots (or cleared the chat) while this reply was still
+            // streaming. Drop it entirely — don't touch the new conversation or its DOM.
+            return;
+        }
+
         if (sawAnyText) {
             conversationHistory.push({ role: 'model', parts: [{ text: fullText }] });
             finalizeBotStream(stream, fullText);
@@ -674,6 +688,8 @@ async function requestBotReply(apiKey) {
             failBotStream(stream, 'Sorry — I could not generate a response this time.', true);
         }
     } catch (err) {
+        if (mySession !== sessionId) return; // stale session — nothing left to safely clean up
+
         if (err && err.name === 'AbortError') {
             // User hit Stop: keep whatever text streamed in so far as the final answer,
             // rather than throwing it away.
@@ -693,7 +709,7 @@ async function requestBotReply(apiKey) {
         isSending = false;
         setComposerBusy(false);
         updateChatActionButtons();
-        document.getElementById('userInput').focus();
+        if (mySession === sessionId) document.getElementById('userInput').focus();
     }
 }
 
