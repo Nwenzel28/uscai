@@ -19,7 +19,7 @@ The application is split into three main files located in the same directory:
 For a quick setup walkthrough, see `SETUP.md`.
 
 1. Presentation Layer (index.html)
-Handles the visual structure, layout, and responsive design using Tailwind CSS utility classes. Mirrors USC's official branding with cardinal (#990000) and gold (#FFCC00) accents. It acts as a passive layout shell that imports the behavioral scripts at the bottom of the document.
+Handles the visual structure, layout, and responsive design using Tailwind CSS utility classes. Mirrors USC's official branding with cardinal `(#990000)` and gold `(#FFCC00)` accents. It acts as a passive layout shell that imports the behavioral scripts at the bottom of the document.
 
 2. Configuration Layer (config.js)
 Contains the BOT_CONFIG global array. This is the only file that needs to be edited to change the behaviour of the Bots. It dictates the bot's display name, FontAwesome icon, and its specific behavioral prompt boundaries.
@@ -33,7 +33,7 @@ Because this project relies entirely on client-side native JavaScript, you do no
 Step 1: Clone or Save the Files **OR** Use This Repository's Github Pages Link (nwenzel28.github.io/uscai)
 Ensure that index.html, config.js, and app.js are all saved in the exact same folder.
 
-Step 2: Open the Application (No need if using Github Pages)
+Step 2: Open the Application (If not using Github Pages)
 Simply double-click the index.html file to open it directly inside any modern web browser (Chrome, Safari, Edge, or Firefox). Alternatively, if you use VS Code, you can right-click index.html and select Open with Live Server.
 
 Step 3: Insert Your API Credentials
@@ -43,7 +43,7 @@ Paste the key into the Setup Local Credentials section at the top of the interfa
 
 Click Save Key Locally.
 
-## ⚠️ Security Notice: Your API key is safely stored locally inside your browser's private localStorage profile. It never touches a backend server and will never be pushed to public version control platforms like GitHub, eliminating the risk of credential leaking.
+## ⚠️ Security Notice: Your API key is safely stored locally inside your browser's private localStorage profile. It never touches a backend server and will never be pushed to public version control platforms like GitHub.
 
 ## ✍️ Weekly Maintenance Guide
 When transitioning to a new engineering discipline each week, your team only needs to modify the parameters in config.js.
@@ -58,6 +58,8 @@ const BOT_CONFIG = [
   }
 ];
 ```
+When creating a prompt that should be used by all bots, you can put it in the `const SHARED_RULES = ` section.
+
 Tips for Effective System Prompts:
 Role/Persona: Explicitly state who the AI is mimicking (e.g., "You are AeroBot, a passionate Aerospace Engineer at USC...").
 
